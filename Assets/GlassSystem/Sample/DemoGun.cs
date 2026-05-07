@@ -18,10 +18,10 @@ namespace GlassSystem.Sample
             if (Input.GetMouseButtonDown(0))
             {
                 RaycastHit hit;
-                var raycastDirection = transform.TransformDirection(Vector3.forward);
-                if (Physics.Raycast(transform.position, raycastDirection, out hit, Mathf.Infinity))
+                var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                if (Physics.Raycast(ray, out hit, Mathf.Infinity))
                 {
-                    Debug.DrawRay(transform.position, raycastDirection * hit.distance, Color.yellow, 10);
+                    Debug.DrawRay(ray.origin, ray.direction * hit.distance, Color.yellow, 10);
                     var glass = hit.collider.gameObject.GetComponent<BaseGlass>();
                     if (glass is not null)
                     {
@@ -29,7 +29,7 @@ namespace GlassSystem.Sample
                         while (true)
                             try
                             {
-                                glass.Break(hit.point, raycastDirection * impactForce);
+                                glass.Break(hit.point, ray.direction * impactForce);
                                 return;
                             }
                             catch (InternalGlassException e)
