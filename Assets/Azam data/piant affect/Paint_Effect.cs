@@ -1,13 +1,6 @@
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-/// <summary>
-/// Attach to any GameObject with a Renderer + MeshFilter.
-/// Assign a Material using Custom/PaperPaint shader in the Inspector.
-/// The script creates a RenderTexture canvas, handles mouse/touch painting,
-/// and drives the material's _PaintTexture in real time.
-/// </summary>
 [RequireComponent(typeof(Renderer))]
 public class Paint_Effect : MonoBehaviour
 {
@@ -25,18 +18,9 @@ public class Paint_Effect : MonoBehaviour
              "white = full paint, black = no paint. Leave empty for a clean circle.")]
     public                        Texture2D brushTexture;
 
-    [Header("Mode")]
-    public bool eraseMode = false;
-
-    [Header("UI (optional — auto-created if left empty)")]
-    [Tooltip("Assign an existing Button to use as the Paint/Erase toggle.")]
-    public Button toggleButton;
-
     [Header("Sounds (optional)")]
     [Tooltip("Played in a loop while the user is painting.")]
     public AudioClip paintSound;
-    [Tooltip("Played in a loop while the user is erasing.")]
-    public AudioClip eraseSound;
     [Range(0f, 1f)] public float soundVolume = 0.7f;
 
     // ── Internals ─────────────────────────────────────────────────────────────
@@ -48,11 +32,9 @@ public class Paint_Effect : MonoBehaviour
     Camera        _cam;
     MeshCollider  _col;
 
-    bool        _wasPainting;
-    Vector2     _prevUV;
-    Text        _btnLabel;
+    bool    _wasPainting;
+    Vector2 _prevUV;
     AudioSource _audioSource;
-    bool        _wasErasing;
 
     static readonly int ID_PaintTex    = Shader.PropertyToID("_PaintTexture");
     static readonly int ID_BrushUV    = Shader.PropertyToID("_BrushUV");
@@ -99,31 +81,24 @@ public class Paint_Effect : MonoBehaviour
         }
         _brushMat = new Material(brushShader) { hideFlags = HideFlags.HideAndDontSave };
 
-        // AudioSource for paint/erase sounds
+        // AudioSource for paint sound
         _audioSource = gameObject.AddComponent<AudioSource>();
         _audioSource.loop        = true;
         _audioSource.playOnAwake = false;
         _audioSource.volume      = soundVolume;
         _audioSource.spatialBlend = 0f;  // 2D sound
-
-        BuildUI();
     }
 
     void Update()
     {
         if (_brushMat == null) return;
 
-        bool leftBtn  = Input.GetMouseButton(0);
-        bool rightBtn = Input.GetMouseButton(1);
-
-        if (!leftBtn && !rightBtn)
+        if (!Input.GetMouseButton(0))
         {
             StopBrushSound();
             _wasPainting = false;
             return;
         }
-
-        bool erasing = eraseMode || rightBtn;
 
         Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit) || hit.collider != _col)
@@ -133,33 +108,28 @@ public class Paint_Effect : MonoBehaviour
             return;
         }
 
-        PlayBrushSound(erasing);
+        PlayBrushSound();
 
         Vector2 uv = hit.textureCoord;
 
-        // Interpolate stamps between frames to avoid gaps in fast strokes
         if (_wasPainting)
-            StampAlongPath(_prevUV, uv, erasing);
+            StampAlongPath(_prevUV, uv);
         else
-            Stamp(uv, erasing);
+            Stamp(uv);
 
         _prevUV      = uv;
         _wasPainting = true;
-        _wasErasing  = erasing;
     }
 
     // ── Sound ─────────────────────────────────────────────────────────────────
 
-    void PlayBrushSound(bool erasing)
+    void PlayBrushSound()
     {
-        if (_audioSource == null) return;
-        AudioClip wanted = erasing ? eraseSound : paintSound;
-        if (wanted == null) { StopBrushSound(); return; }
+        if (_audioSource == null || paintSound == null) { StopBrushSound(); return; }
 
-        // Swap clip only when mode changes or sound stopped
-        if (_audioSource.clip != wanted || !_audioSource.isPlaying)
+        if (_audioSource.clip != paintSound || !_audioSource.isPlaying)
         {
-            _audioSource.clip   = wanted;
+            _audioSource.clip   = paintSound;
             _audioSource.volume = soundVolume;
             _audioSource.Play();
         }
@@ -180,117 +150,29 @@ public class Paint_Effect : MonoBehaviour
 
     // ── Painting ──────────────────────────────────────────────────────────────
 
-    void StampAlongPath(Vector2 from, Vector2 to, bool erase)
+    void StampAlongPath(Vector2 from, Vector2 to)
     {
-        // Tighter spacing with a texture brush so stamps fuse into a solid stroke
         float step  = brushSize * (brushTexture != null ? 0.15f : 0.35f);
         int   count = Mathf.Clamp(Mathf.CeilToInt(Vector2.Distance(from, to) / step), 1, 32);
 
         for (int i = 0; i <= count; i++)
-            Stamp(Vector2.Lerp(from, to, (float)i / count), erase);
+            Stamp(Vector2.Lerp(from, to, (float)i / count));
     }
 
-    void Stamp(Vector2 uv, bool erase)
+    void Stamp(Vector2 uv)
     {
-        _brushMat.SetVector(ID_BrushUV,    new Vector4(uv.x, uv.y, 0f, 0f));
-        _brushMat.SetFloat (ID_BrushSize,  brushSize);
-        _brushMat.SetColor (ID_BrushCol,   brushColor);
-        _brushMat.SetFloat (ID_BrushHard,  brushHardness);
-        _brushMat.SetFloat (ID_EraseMode,  erase ? 1f : 0f);
+        _brushMat.SetVector(ID_BrushUV,   new Vector4(uv.x, uv.y, 0f, 0f));
+        _brushMat.SetFloat (ID_BrushSize, brushSize);
+        _brushMat.SetColor (ID_BrushCol,  brushColor);
+        _brushMat.SetFloat (ID_BrushHard, brushHardness);
+        _brushMat.SetFloat (ID_EraseMode, 0f);
 
-        // Custom brush texture — swap at runtime without restarting
         bool hasTex = brushTexture != null;
         _brushMat.SetFloat  (ID_UseBrushTx, hasTex ? 1f : 0f);
         if (hasTex) _brushMat.SetTexture(ID_BrushTex, brushTexture);
 
-        // Read _paintRT → stamp brush → write _tempRT → copy back
         Graphics.Blit(_paintRT, _tempRT, _brushMat);
         Graphics.Blit(_tempRT,  _paintRT);
-    }
-
-    // ── UI ────────────────────────────────────────────────────────────────────
-
-    void BuildUI()
-    {
-        if (toggleButton != null)
-        {
-            _btnLabel = toggleButton.GetComponentInChildren<Text>();
-            toggleButton.onClick.AddListener(ToggleMode);
-            RefreshLabel();
-            return;
-        }
-
-        // Auto-create a Canvas + button anchored to the bottom-center
-        Canvas canvas = FindFirstObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            var cgo = new GameObject("PaintCanvas");
-            canvas  = cgo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            cgo.AddComponent<CanvasScaler>();
-            cgo.AddComponent<GraphicRaycaster>();
-        }
-
-        if (FindFirstObjectByType<EventSystem>() == null)
-        {
-            var esgo = new GameObject("EventSystem");
-            esgo.AddComponent<EventSystem>();
-            esgo.AddComponent<StandaloneInputModule>();
-        }
-
-        // Button container
-        var bgo = new GameObject("PaintEraseToggle");
-        bgo.transform.SetParent(canvas.transform, false);
-
-        var rt          = bgo.AddComponent<RectTransform>();
-        rt.anchorMin    = new Vector2(0.5f, 0f);
-        rt.anchorMax    = new Vector2(0.5f, 0f);
-        rt.pivot        = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0f, 24f);
-        rt.sizeDelta    = new Vector2(220f, 58f);
-
-        var img         = bgo.AddComponent<Image>();
-        img.color       = new Color(0.08f, 0.08f, 0.08f, 0.9f);
-        toggleButton    = bgo.AddComponent<Button>();
-        toggleButton.targetGraphic = img;
-
-        // Hover tint
-        var colors          = toggleButton.colors;
-        colors.highlightedColor = new Color(0.25f, 0.25f, 0.25f, 0.95f);
-        colors.pressedColor     = new Color(0.4f,  0.4f,  0.4f,  1.0f);
-        toggleButton.colors = colors;
-
-        // Label
-        var lgo   = new GameObject("Label");
-        lgo.transform.SetParent(bgo.transform, false);
-        var lrt   = lgo.AddComponent<RectTransform>();
-        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one; lrt.sizeDelta = Vector2.zero;
-
-        _btnLabel           = lgo.AddComponent<Text>();
-        _btnLabel.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        _btnLabel.fontSize  = 22;
-        _btnLabel.fontStyle = FontStyle.Bold;
-        _btnLabel.alignment = TextAnchor.MiddleCenter;
-        _btnLabel.color     = Color.white;
-
-        toggleButton.onClick.AddListener(ToggleMode);
-        RefreshLabel();
-    }
-
-    void ToggleMode()
-    {
-        eraseMode = !eraseMode;
-        // Keep the surface material's debug flag in sync (optional)
-        if (_surfaceMat != null)
-            _surfaceMat.SetFloat(ID_EraseMode, eraseMode ? 1f : 0f);
-        RefreshLabel();
-    }
-
-    // Button text shows the ACTION the user will switch TO
-    void RefreshLabel()
-    {
-        if (_btnLabel == null) return;
-        _btnLabel.text = eraseMode ? "Paint" : "Erase";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

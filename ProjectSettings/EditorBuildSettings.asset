@@ -6,8 +6,17 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/GlassSystem/Sample/MainManue_Azam k.unity
+    guid: 4c7ff1998bd937e4f8f83a3f97dc0718
+  - enabled: 1
+    path: Assets/GlassSystem/Sample/ANXIETY_PeperPaintScene_Azam_k.unity
+    guid: 6cd27929ef3ea3541bf5bc5c2d75d2cf
+  - enabled: 1
+    path: Assets/GlassSystem/Sample/DEADLINE_Bomb_Scene Azam k 1.unity
+    guid: d89d6bf71f7322a4589e91258185ff02
+  - enabled: 1
+    path: Assets/GlassSystem/Sample/FILTER_GlassSampleScene Azam k.unity
+    guid: 859b1f7fa2ab9e4418a9d6b5772a928f
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
