@@ -16,6 +16,8 @@ namespace GlassSystem.Scripts
 
         public override void Break(Vector3 breakPosition, Vector3 originVector, int patternIndex = -1, float rotation = Single.NaN)
         {
+            if (_parentPanel.breakSound != null)
+                AudioSource.PlayClipAtPoint(_parentPanel.breakSound, transform.position);
             base.Break(breakPosition, originVector, patternIndex, rotation);
             _parentPanel.OnShardDestroyed(this);
             Destroy(gameObject);

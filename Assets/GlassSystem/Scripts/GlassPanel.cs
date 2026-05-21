@@ -13,6 +13,9 @@ namespace GlassSystem.Scripts
         protected List<Shard> _shards;  // child of this glass panel once shattered
 
         public int health = 2;
+
+        [Header("Sound")]
+        public AudioClip breakSound;
         
         protected void Start()
         {
@@ -79,8 +82,12 @@ namespace GlassSystem.Scripts
              }
              
              _shards = new();
+
+             if (breakSound != null)
+                 AudioSource.PlayClipAtPoint(breakSound, transform.position);
+
              base.Break(breakPosition, originVector, patternIndex, rotation);
-             
+
              Destroy(GetComponent<MeshFilter>());
              Destroy(GetComponent<MeshRenderer>());
              Destroy(GetComponent<MeshRenderer>());

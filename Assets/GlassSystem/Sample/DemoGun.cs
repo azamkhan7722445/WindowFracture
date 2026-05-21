@@ -30,6 +30,7 @@ namespace GlassSystem.Sample
                             try
                             {
                                 glass.Break(hit.point, ray.direction * impactForce);
+                                CameraShake.Instance?.Shake();
                                 return;
                             }
                             catch (InternalGlassException e)

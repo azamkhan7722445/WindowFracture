@@ -355,6 +355,10 @@ PrefabInstance:
       propertyPath: m_TagString
       value: Glass
       objectReference: {fileID: 0}
+    - target: {fileID: 6617583239465076362, guid: 20771ad2888ef2e43a290cba364c7720, type: 3}
+      propertyPath: breakSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 6100d09ee1db5814ca712b7fd9b764af, type: 3}
     m_RemovedComponents:
     - {fileID: 6617583239465076362, guid: 868f1ed900aac314f91480651543f59c, type: 3}
     m_RemovedGameObjects: []
@@ -440,6 +444,7 @@ GameObject:
   - component: {fileID: 1374336861}
   - component: {fileID: 1374336865}
   - component: {fileID: 1374336866}
+  - component: {fileID: 1374336867}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -605,6 +610,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GlassSystem.Sample.DemoGun
   impactForce: 1
   Retry: 3
+--- !u!114 &1374336867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1374336860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f9a791b9eae32b488df32282bc448c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  duration: 0.2
+  magnitude: 0.02
+  frequency: 20
 --- !u!1 &1380005146
 GameObject:
   m_ObjectHideFlags: 0
