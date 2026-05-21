@@ -39,7 +39,7 @@ public class TimerControllerCanvas : MonoBehaviour
     float        elapsedTime;
     bool         isRunning      = true;
     bool         blastTriggered;
-    int          lastTickSecond = -1;
+    int          lastTickSecond = 0;
 
     RectTransform canvasRect;
     Vector2       originalAnchoredPos;
