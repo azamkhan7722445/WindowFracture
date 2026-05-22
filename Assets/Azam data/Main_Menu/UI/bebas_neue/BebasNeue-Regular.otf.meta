@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 8abcd2fdbbecbbe419a660e022990dc6
+guid: 8ed98f65f54b5d047afe91ed82d0a56c
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -8,7 +8,8 @@ TrueTypeFontImporter:
   characterSpacing: 0
   characterPadding: 1
   includeFontData: 1
-  fontNames: []
+  fontNames:
+  - Bebas Neue
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class Main_Menu_UI_Manager : MonoBehaviour
 {
@@ -16,8 +17,8 @@ public class Main_Menu_UI_Manager : MonoBehaviour
     const string SCENE_FILTER   = "FILTER_GlassSampleScene Azam k";
     const string SCENE_DEADLINE = "DEADLINE_Bomb_Scene Azam k 1";
 
-    static readonly Color COL_SELECTED   = Color.white;
-    static readonly Color COL_DESELECTED = new(0.38f, 0.38f, 0.38f, 1f);
+    public Color COL_SELECTED   = Color.white;
+    public Color COL_DESELECTED = new(0.38f, 0.38f, 0.38f, 1f);
 
     int    _selected = 0;
     Image[] _imgs;
@@ -48,7 +49,18 @@ public class Main_Menu_UI_Manager : MonoBehaviour
 
     void Play()
     {
+        StartCoroutine(LoadingScreen());
+       
+    }
+
+    public GameObject LoadingScreenPanel;
+    IEnumerator LoadingScreen()
+    {
+        LoadingScreenPanel.SetActive(true);
+        yield return new WaitForSeconds(2f);
+
         string[] scenes = { SCENE_ANXIETY, SCENE_FILTER, SCENE_DEADLINE };
         SceneManager.LoadScene(scenes[_selected]);
     }
+
 }
