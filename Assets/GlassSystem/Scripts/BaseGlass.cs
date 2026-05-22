@@ -25,6 +25,10 @@ namespace GlassSystem.Scripts
         protected float _thickness;     // glasss thickness used when extruding the shard mesh
         protected Polygon2D _polygon;   // 2D polygon matching mesh geometry
         protected Vector2[] _uvs;       // polygon uvs (uvs.count match _polygon.vertices.count)
+        protected Vector3[] _vertices;
+
+
+       
 
         /// <summary>
         /// Entry point to break the glass.

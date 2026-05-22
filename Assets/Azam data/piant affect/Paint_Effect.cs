@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -7,93 +8,120 @@ public class Paint_Effect : MonoBehaviour
     [Header("Textures")]
     [Tooltip("Assign a white crumpled paper texture here.")]
     public Texture2D paperTexture;
+
     [Tooltip("Resolution of the paint RenderTexture (width = height).")]
     public int canvasResolution = 1024;
 
     [Header("Brush")]
-    [Range(0.005f, 0.15f)] public float     brushSize     = 0.03f;
-    public                        Color     brushColor     = Color.black;
-    [Range(0f, 1f)]        public float     brushHardness  = 0.8f;
-    [Tooltip("Optional custom brush shape. Drag any greyscale texture here — " +
-             "white = full paint, black = no paint. Leave empty for a clean circle.")]
-    public                        Texture2D brushTexture;
+    [Range(0.005f, 0.15f)] public float brushSize = 0.03f;
+    public Color brushColor = Color.black;
+    [Range(0f, 1f)] public float brushHardness = 0.8f;
 
-    [Header("Sounds (optional)")]
+    [Tooltip("Optional custom brush shape. Drag any greyscale texture here - white = full paint, black = no paint.")]
+    public Texture2D brushTexture;
+
+    [Header("Sounds Optional")]
     [Tooltip("Played in a loop while the user is painting.")]
     public AudioClip paintSound;
+
     [Range(0f, 1f)] public float soundVolume = 0.7f;
 
-    // ── Internals ─────────────────────────────────────────────────────────────
+    [Header("Level Complete")]
+    [SerializeField, Range(0f, 100f)] private float levelCompletePercent = 90f;
+    [SerializeField] private GameObject levelCompleteUI;
+
+    [Tooltip("How often paint percentage is checked while painting.")]
+    [SerializeField] private float percentageCheckInterval = 0.25f;
+
+    [Tooltip("Pixels with alpha above this value count as painted.")]
+    [SerializeField, Range(0f, 1f)] private float paintedAlphaThreshold = 0.1f;
+
+    public float PaintedPercentage { get; private set; }
 
     RenderTexture _paintRT;
     RenderTexture _tempRT;
-    Material      _surfaceMat;
-    Material      _brushMat;
-    Camera        _cam;
-    MeshCollider  _col;
+    Material _surfaceMat;
+    Material _brushMat;
+    Camera _cam;
+    MeshCollider _col;
 
-    bool    _wasPainting;
+    bool _wasPainting;
     Vector2 _prevUV;
     AudioSource _audioSource;
 
-    static readonly int ID_PaintTex    = Shader.PropertyToID("_PaintTexture");
-    static readonly int ID_BrushUV    = Shader.PropertyToID("_BrushUV");
-    static readonly int ID_BrushSize  = Shader.PropertyToID("_BrushSize");
-    static readonly int ID_BrushCol   = Shader.PropertyToID("_BrushColor");
-    static readonly int ID_BrushHard  = Shader.PropertyToID("_BrushHardness");
-    static readonly int ID_EraseMode  = Shader.PropertyToID("_EraseMode");
-    static readonly int ID_PaperTex   = Shader.PropertyToID("_PaperTexture");
-    static readonly int ID_BrushTex   = Shader.PropertyToID("_BrushTexture");
-    static readonly int ID_UseBrushTx = Shader.PropertyToID("_UseBrushTex");
+    Texture2D _percentageReadTexture;
+    float _nextPercentageCheckTime;
+    bool _levelCompleteShown;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    static readonly int ID_PaintTex = Shader.PropertyToID("_PaintTexture");
+    static readonly int ID_BrushUV = Shader.PropertyToID("_BrushUV");
+    static readonly int ID_BrushSize = Shader.PropertyToID("_BrushSize");
+    static readonly int ID_BrushCol = Shader.PropertyToID("_BrushColor");
+    static readonly int ID_BrushHard = Shader.PropertyToID("_BrushHardness");
+    static readonly int ID_EraseMode = Shader.PropertyToID("_EraseMode");
+    static readonly int ID_PaperTex = Shader.PropertyToID("_PaperTexture");
+    static readonly int ID_BrushTex = Shader.PropertyToID("_BrushTexture");
+    static readonly int ID_UseBrushTx = Shader.PropertyToID("_UseBrushTex");
 
     void Start()
     {
         _cam = Camera.main;
 
-        // MeshCollider required for hit.textureCoord UV lookup
+        if (levelCompleteUI != null)
+            levelCompleteUI.SetActive(false);
+
         _col = GetComponent<MeshCollider>();
-        if (_col == null) _col = gameObject.AddComponent<MeshCollider>();
+        if (_col == null)
+            _col = gameObject.AddComponent<MeshCollider>();
+
         var mf = GetComponent<MeshFilter>();
         if (mf != null && _col.sharedMesh == null)
             _col.sharedMesh = mf.sharedMesh;
 
-        // Paint canvas RenderTextures (ARGB32: alpha encodes stroke coverage)
         _paintRT = CreateRT(canvasResolution);
-        _tempRT  = CreateRT(canvasResolution);
+        _tempRT = CreateRT(canvasResolution);
         ClearToTransparent(_paintRT);
 
-        // Surface material — must use Custom/PaperPaint shader
+        _percentageReadTexture = new Texture2D(
+            canvasResolution,
+            canvasResolution,
+            TextureFormat.RGBA32,
+            false
+        );
+
         _surfaceMat = GetComponent<Renderer>().material;
+
         if (paperTexture != null)
             _surfaceMat.SetTexture(ID_PaperTex, paperTexture);
+
         _surfaceMat.SetTexture(ID_PaintTex, _paintRT);
 
-        // Brush blit material
         var brushShader = Shader.Find("Hidden/BrushStamp");
         if (brushShader == null)
         {
-            Debug.LogError("[Paint_Effect] Hidden/BrushStamp shader not found. " +
-                           "Make sure BrushStampShader.shader is in the project.");
+            Debug.LogError("[Paint_Effect] Hidden/BrushStamp shader not found. Make sure BrushStampShader.shader is in the project.");
             enabled = false;
             return;
         }
-        _brushMat = new Material(brushShader) { hideFlags = HideFlags.HideAndDontSave };
 
-        // AudioSource for paint sound
+        _brushMat = new Material(brushShader)
+        {
+            hideFlags = HideFlags.HideAndDontSave
+        };
+
         _audioSource = gameObject.AddComponent<AudioSource>();
-        _audioSource.loop        = true;
+        _audioSource.loop = true;
         _audioSource.playOnAwake = false;
-        _audioSource.volume      = soundVolume;
-        _audioSource.spatialBlend = 0f;  // 2D sound
+        _audioSource.volume = soundVolume;
+        _audioSource.spatialBlend = 0f;
     }
 
     void Update()
     {
-        if (_brushMat == null) return;
+        if (_brushMat == null)
+            return;
 
-        if (!Input.GetMouseButton(0))
+        if (!Input.GetMouseButton(0) || !CanShoot)
         {
             StopBrushSound();
             _wasPainting = false;
@@ -101,6 +129,7 @@ public class Paint_Effect : MonoBehaviour
         }
 
         Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
+
         if (!Physics.Raycast(ray, out RaycastHit hit) || hit.collider != _col)
         {
             StopBrushSound();
@@ -117,19 +146,23 @@ public class Paint_Effect : MonoBehaviour
         else
             Stamp(uv);
 
-        _prevUV      = uv;
+        _prevUV = uv;
         _wasPainting = true;
-    }
 
-    // ── Sound ─────────────────────────────────────────────────────────────────
+        CheckPaintPercentageTimer();
+    }
 
     void PlayBrushSound()
     {
-        if (_audioSource == null || paintSound == null) { StopBrushSound(); return; }
+        if (_audioSource == null || paintSound == null)
+        {
+            StopBrushSound();
+            return;
+        }
 
         if (_audioSource.clip != paintSound || !_audioSource.isPlaying)
         {
-            _audioSource.clip   = paintSound;
+            _audioSource.clip = paintSound;
             _audioSource.volume = soundVolume;
             _audioSource.Play();
         }
@@ -141,19 +174,10 @@ public class Paint_Effect : MonoBehaviour
             _audioSource.Stop();
     }
 
-    void OnDestroy()
-    {
-        if (_paintRT  != null) { _paintRT.Release();  Destroy(_paintRT);  }
-        if (_tempRT   != null) { _tempRT.Release();   Destroy(_tempRT);   }
-        if (_brushMat != null) Destroy(_brushMat);
-    }
-
-    // ── Painting ──────────────────────────────────────────────────────────────
-
     void StampAlongPath(Vector2 from, Vector2 to)
     {
-        float step  = brushSize * (brushTexture != null ? 0.15f : 0.35f);
-        int   count = Mathf.Clamp(Mathf.CeilToInt(Vector2.Distance(from, to) / step), 1, 32);
+        float step = brushSize * (brushTexture != null ? 0.15f : 0.35f);
+        int count = Mathf.Clamp(Mathf.CeilToInt(Vector2.Distance(from, to) / step), 1, 32);
 
         for (int i = 0; i <= count; i++)
             Stamp(Vector2.Lerp(from, to, (float)i / count));
@@ -161,21 +185,108 @@ public class Paint_Effect : MonoBehaviour
 
     void Stamp(Vector2 uv)
     {
-        _brushMat.SetVector(ID_BrushUV,   new Vector4(uv.x, uv.y, 0f, 0f));
-        _brushMat.SetFloat (ID_BrushSize, brushSize);
-        _brushMat.SetColor (ID_BrushCol,  brushColor);
-        _brushMat.SetFloat (ID_BrushHard, brushHardness);
-        _brushMat.SetFloat (ID_EraseMode, 0f);
+        _brushMat.SetVector(ID_BrushUV, new Vector4(uv.x, uv.y, 0f, 0f));
+        _brushMat.SetFloat(ID_BrushSize, brushSize);
+        _brushMat.SetColor(ID_BrushCol, brushColor);
+        _brushMat.SetFloat(ID_BrushHard, brushHardness);
+        _brushMat.SetFloat(ID_EraseMode, 0f);
 
         bool hasTex = brushTexture != null;
-        _brushMat.SetFloat  (ID_UseBrushTx, hasTex ? 1f : 0f);
-        if (hasTex) _brushMat.SetTexture(ID_BrushTex, brushTexture);
+
+        _brushMat.SetFloat(ID_UseBrushTx, hasTex ? 1f : 0f);
+
+        if (hasTex)
+            _brushMat.SetTexture(ID_BrushTex, brushTexture);
 
         Graphics.Blit(_paintRT, _tempRT, _brushMat);
-        Graphics.Blit(_tempRT,  _paintRT);
+        Graphics.Blit(_tempRT, _paintRT);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    void CheckPaintPercentageTimer()
+    {
+        if (Time.time < _nextPercentageCheckTime)
+            return;
+
+        _nextPercentageCheckTime = Time.time + percentageCheckInterval;
+        UpdatePaintedPercentage();
+    }
+
+    void UpdatePaintedPercentage()
+    {
+        if (_paintRT == null || _percentageReadTexture == null)
+            return;
+
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = _paintRT;
+
+        _percentageReadTexture.ReadPixels(
+            new Rect(0, 0, canvasResolution, canvasResolution),
+            0,
+            0
+        );
+
+        _percentageReadTexture.Apply();
+
+        RenderTexture.active = previous;
+
+        Color32[] pixels = _percentageReadTexture.GetPixels32();
+
+        int paintedPixels = 0;
+        byte alphaLimit = (byte)(paintedAlphaThreshold * 255f);
+
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            if (pixels[i].a > alphaLimit)
+                paintedPixels++;
+        }
+
+        PaintedPercentage = (paintedPixels / (float)pixels.Length) * 100f;
+
+        Debug.Log($"Paint completed: {PaintedPercentage:0.0}%");
+
+        CheckLevelComplete();
+    }
+
+    void CheckLevelComplete()
+    {
+        if (_levelCompleteShown)
+            return;
+
+        if (PaintedPercentage >= levelCompletePercent)
+        {
+            _levelCompleteShown = true;
+            ShowLevelComplete();
+        }
+    }
+
+    void ShowLevelComplete()
+    {
+        Debug.Log("Level Complete");
+
+        if (levelCompleteUI != null)
+            levelCompleteUI.SetActive(true);
+    }
+
+    void OnDestroy()
+    {
+        if (_paintRT != null)
+        {
+            _paintRT.Release();
+            Destroy(_paintRT);
+        }
+
+        if (_tempRT != null)
+        {
+            _tempRT.Release();
+            Destroy(_tempRT);
+        }
+
+        if (_brushMat != null)
+            Destroy(_brushMat);
+
+        if (_percentageReadTexture != null)
+            Destroy(_percentageReadTexture);
+    }
 
     static RenderTexture CreateRT(int size)
     {
@@ -187,9 +298,18 @@ public class Paint_Effect : MonoBehaviour
 
     static void ClearToTransparent(RenderTexture rt)
     {
-        var prev = RenderTexture.active;
+        RenderTexture previous = RenderTexture.active;
         RenderTexture.active = rt;
         GL.Clear(true, true, Color.clear);
-        RenderTexture.active = prev;
+        RenderTexture.active = previous;
     }
+    private bool CanShoot = true;
+
+    public IEnumerator ActiveDeplay(float time = 0, bool _canShoot = false)
+    {
+        yield return new WaitForSeconds(time);
+        CanShoot = _canShoot;
+    }
+
+    public void SetAction(bool canShoot) => StartCoroutine(ActiveDeplay(canShoot ? 0.5f : 0, canShoot));
 }

@@ -2563,7 +2563,6 @@ GameObject:
   - component: {fileID: 1374336862}
   - component: {fileID: 1374336861}
   - component: {fileID: 1374336865}
-  - component: {fileID: 1374336866}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -2715,20 +2714,6 @@ MonoBehaviour:
   _enableSpeedAcceleration: 0
   _speedAccelerationFactor: 1.5
   _initPositonButton: 114
---- !u!114 &1374336866
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1374336860}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 10e93c5aa2a5f4340a8a53af783af337, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GlassSystem.Sample.DemoGun
-  impactForce: 1
-  Retry: 3
 --- !u!1 &1380005146
 GameObject:
   m_ObjectHideFlags: 0
