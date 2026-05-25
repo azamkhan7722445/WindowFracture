@@ -8,7 +8,8 @@
       "mcp__unity-mcp__Unity_ManageGameObject",
       "mcp__unity-mcp__Unity_ManageAsset",
       "mcp__unity-mcp__Unity_ValidateScript",
-      "mcp__unity-mcp__Unity_RunCommand"
+      "mcp__unity-mcp__Unity_RunCommand",
+      "mcp__unity-mcp__Unity_GetConsoleLogs"
     ]
   }
 }
