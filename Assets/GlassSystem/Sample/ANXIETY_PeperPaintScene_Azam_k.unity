@@ -434,6 +434,7 @@ MonoBehaviour:
   brushColor: {r: 0, g: 0, b: 0, a: 1}
   brushHardness: 1
   brushTexture: {fileID: 10307, guid: 0000000000000000f000000000000000, type: 0}
+  brushStampShader: {fileID: 4800000, guid: 3178c3ea683b9ff4098bcb6677059be9, type: 3}
   paintSound: {fileID: 8300000, guid: e4fc8e3dfc66a6e48bbfc355830f542b, type: 3}
   soundVolume: 0.7
   levelCompletePercent: 70

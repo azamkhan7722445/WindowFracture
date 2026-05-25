@@ -20,6 +20,10 @@ public class Paint_Effect : MonoBehaviour
     [Tooltip("Optional custom brush shape. Drag any greyscale texture here - white = full paint, black = no paint.")]
     public Texture2D brushTexture;
 
+    [Header("Brush Shader")]
+    [Tooltip("Drag BrushStampShader here so it is guaranteed included in builds.")]
+    public Shader brushStampShader;
+
     [Header("Sounds Optional")]
     [Tooltip("Played in a loop while the user is painting.")]
     public AudioClip paintSound;
@@ -96,10 +100,12 @@ public class Paint_Effect : MonoBehaviour
 
         _surfaceMat.SetTexture(ID_PaintTex, _paintRT);
 
-        var brushShader = Shader.Find("Hidden/BrushStamp");
+        // Use directly assigned shader first — guaranteed included in build.
+        // Fall back to Shader.Find only in editor where stripping doesn't apply.
+        var brushShader = brushStampShader != null ? brushStampShader : Shader.Find("Hidden/BrushStamp");
         if (brushShader == null)
         {
-            Debug.LogError("[Paint_Effect] Hidden/BrushStamp shader not found. Make sure BrushStampShader.shader is in the project.");
+            Debug.LogError("[Paint_Effect] BrushStamp shader not found. Assign it to the 'Brush Stamp Shader' field in the Inspector.");
             enabled = false;
             return;
         }
@@ -116,19 +122,58 @@ public class Paint_Effect : MonoBehaviour
         _audioSource.spatialBlend = 0f;
     }
 
+    bool GetInputPosition(out Vector2 screenPos, out int fingerId)
+    {
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            TouchPhase phase = touch.phase;
+            if (phase == TouchPhase.Began || phase == TouchPhase.Moved || phase == TouchPhase.Stationary)
+            {
+                // Skip if finger is over a UI element
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                {
+                    screenPos = Vector2.zero;
+                    fingerId = -1;
+                    return false;
+                }
+                screenPos = touch.position;
+                fingerId = touch.fingerId;
+                return true;
+            }
+        }
+        else if (Input.GetMouseButton(0))
+        {
+            // Skip if mouse is over a UI element (editor)
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                screenPos = Vector2.zero;
+                fingerId = -1;
+                return false;
+            }
+            screenPos = Input.mousePosition;
+            fingerId = -1;
+            return true;
+        }
+
+        screenPos = Vector2.zero;
+        fingerId = -1;
+        return false;
+    }
+
     void Update()
     {
-        if (_brushMat == null)
+        if (_brushMat == null || _cam == null)
             return;
 
-        if (!Input.GetMouseButton(0) || !CanShoot)
+        if (!GetInputPosition(out Vector2 inputPos, out _) || !CanShoot)
         {
             StopBrushSound();
             _wasPainting = false;
             return;
         }
 
-        Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
+        Ray ray = _cam.ScreenPointToRay(inputPos);
 
         if (!Physics.Raycast(ray, out RaycastHit hit) || hit.collider != _col)
         {
