@@ -1,3 +1,10 @@
 {
-	"name": "GlassSystem"
+	"name": "GlassSystem",
+	"references": [
+		"Unity.TextMeshPro",
+		"UnityEngine.UI",
+		"Sirenix.OdinInspector.Attributes",
+		"MoreMountains.NiceVibrations",
+		"MoreMountains.NiceVibrations.Haptics"
+	]
 }
