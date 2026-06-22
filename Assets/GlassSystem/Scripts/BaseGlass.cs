@@ -18,6 +18,8 @@ namespace GlassSystem.Scripts
         private const float MicroShardTimer = 4f;
         private const float SmallShardSurface = 0.15f;
         private const float SmallShardTimer = 8f;
+        private const float MinShardColliderExtent = 0.001f;
+        private const float MinShardPolygonArea = 1e-6f;
         protected const float Tolerance = 0.001f;
 
         [TitleGroup("Fracture Patterns"), SerializeField]
@@ -66,6 +68,9 @@ namespace GlassSystem.Scripts
             var materials = GetComponent<Renderer>().sharedMaterials;
             foreach (Polygon2D shardPolygon in shardPolygons)
             {
+                if (!IsValidShardPolygon(shardPolygon))
+                    continue;
+
                 var center = Point2D.Centroid(shardPolygon.Vertices);
                 var centeredShardPolygon = shardPolygon.TranslateBy(-center.ToVector2D());
                 Vector2[] uvs = null;
@@ -114,9 +119,7 @@ namespace GlassSystem.Scripts
             var meshRenderer = go.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterials = materials;
 
-            var meshCollider = go.AddComponent<MeshCollider>();
-            meshCollider.convex = true;
-            meshCollider.sharedMesh = mesh;
+            SetupShardCollider(go, mesh);
 
             Shard shard = null;
             if (shardSurface > SmallShardSurface)
@@ -139,6 +142,58 @@ namespace GlassSystem.Scripts
             }
 
             return shard;
+        }
+
+        static bool IsValidShardPolygon(Polygon2D polygon)
+        {
+            var vertices = polygon.Vertices.ToArray();
+            if (vertices.Length < 3)
+                return false;
+
+            return GetPolygonArea(vertices) >= MinShardPolygonArea;
+        }
+
+        static double GetPolygonArea(Point2D[] vertices)
+        {
+            double area = 0d;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Point2D current = vertices[i];
+                Point2D next = vertices[(i + 1) % vertices.Length];
+                area += current.X * next.Y - next.X * current.Y;
+            }
+
+            return Math.Abs(area) * 0.5d;
+        }
+
+        static bool CanUseConvexMeshCollider(Mesh mesh)
+        {
+            if (mesh == null || mesh.vertexCount < 4)
+                return false;
+
+            Vector3 size = mesh.bounds.size;
+            return size.x >= MinShardColliderExtent
+                   && size.y >= MinShardColliderExtent
+                   && size.z >= MinShardColliderExtent;
+        }
+
+        static void SetupShardCollider(GameObject go, Mesh mesh)
+        {
+            if (CanUseConvexMeshCollider(mesh))
+            {
+                var meshCollider = go.AddComponent<MeshCollider>();
+                meshCollider.convex = true;
+                meshCollider.sharedMesh = mesh;
+                return;
+            }
+
+            var boxCollider = go.AddComponent<BoxCollider>();
+            Vector3 size = mesh.bounds.size;
+            size.x = Mathf.Max(size.x, MinShardColliderExtent);
+            size.y = Mathf.Max(size.y, MinShardColliderExtent);
+            size.z = Mathf.Max(size.z, MinShardColliderExtent);
+            boxCollider.size = size;
+            boxCollider.center = mesh.bounds.center;
         }
 
         public void Fall()
@@ -168,6 +223,8 @@ namespace GlassSystem.Scripts
 
         private Mesh CreateMesh(Polygon2D polygon, Vector2[] uvs, float thickness)
         {
+            thickness = Mathf.Max(thickness, MinShardColliderExtent);
+
             var mesh = new Mesh { name = "Shard" };
             var indices = new List<int>();
 

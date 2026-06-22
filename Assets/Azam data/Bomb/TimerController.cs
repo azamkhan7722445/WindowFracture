@@ -8,7 +8,7 @@ namespace Azam_data.Bomb
 {
     [RequireComponent(typeof(RectTransform))]
     [RequireComponent(typeof(AudioSource))]
-    public class TimerControllerCanvas : MonoBehaviour
+    public class TimerControllerCanvas : MonoBehaviour,IManagerInterface
     {
         [Header("UI References")] public TextMeshProUGUI timerText;
         public Image timerImage; // optional — drag Image for color shift
@@ -51,9 +51,22 @@ namespace Azam_data.Bomb
         bool initialized;
 
         // ──────────────────────────────────────────────────────────────
-        void Start()
+        
+        public IEnumerator Initialize()
         {
             EnsureInitialized();
+            
+            yield return null;
+        }
+
+        public IEnumerator PostInitialize()
+        {
+            yield return null;
+        }
+
+        public IEnumerator SetForGameplay()
+        {
+            yield return null;
         }
 
         void EnsureInitialized()
@@ -190,5 +203,7 @@ namespace Azam_data.Bomb
 
             targetCamera.transform.localPosition = cameraOriginalLocalPos;
         }
+
+       
     }
 }

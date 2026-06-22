@@ -1,11 +1,12 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using Arslan.Scripting;
 using Azam_data.Bomb;
 using GlassSystem.Scripts;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-public class DeadlineSceneHandler : MonoBehaviour
+public class DeadlineSceneHandler : MonoBehaviour, IManagerInterface
 {
     [TitleGroup("Refs"), SerializeField] private GlassPanel glassPanel;
     [TitleGroup("Refs"), SerializeField] private GamePanelHandling gamePanelHandling;
@@ -56,7 +57,7 @@ public class DeadlineSceneHandler : MonoBehaviour
 
     [TitleGroup("Debug"), ShowInInspector, ReadOnly]
     private bool _onLevelFails = false;
-    
+
     [TitleGroup("Debug"), ShowInInspector, ReadOnly]
     private bool _onLevelCompletes = false;
 
@@ -71,42 +72,53 @@ public class DeadlineSceneHandler : MonoBehaviour
 
     private Coroutine _levelFailTimerRoutine;
 
-    private void Awake()
+
+    public IEnumerator Initialize()
     {
-        if (glassPanel == null)
+        if (!glassPanel)
         {
             Debug.LogError($"{nameof(DeadlineSceneHandler)} needs a {nameof(GlassPanel)} reference.", this);
-            return;
+            yield break;
         }
 
-        if (blastParticlePrefab == null)
+        if (!blastParticlePrefab)
         {
             Debug.LogError($"{nameof(DeadlineSceneHandler)} needs a blast particle prefab.", this);
-            return;
+            yield break;
         }
 
-        for (int i = 0; i < prespawnParticles; i++)
+        for (var i = 0; i < prespawnParticles; i++)
         {
             var particle = Instantiate(blastParticlePrefab, transform);
             particle.gameObject.SetActive(false);
             _preSpawnedObjects.Add(particle.gameObject);
         }
 
-        if (gamePanelHandling == null)
+        if (!gamePanelHandling)
             gamePanelHandling = GamePanelHandling.Instance;
 
-        if (timerController == null)
+        if (!timerController)
             timerController = FindFirstObjectByType<TimerControllerCanvas>();
 
         glassPanel.OnRemainingHealthUpdated += OnRemainingHealthUpdated;
+
+
+        yield return null;
     }
 
-    private void Start()
+    public IEnumerator PostInitialize()
+    {
+        yield return null;
+    }
+
+    public IEnumerator SetForGameplay()
     {
         if (timerController != null)
             timerController.SetTime(0f, levelFailDelay);
 
         _levelFailTimerRoutine = StartCoroutine(LevelFailTimer());
+        
+        yield return null;
     }
 
     private void OnDestroy()
@@ -378,6 +390,8 @@ public class DeadlineSceneHandler : MonoBehaviour
         if (gamePanelHandling != null)
             gamePanelHandling.LevelFailed();
         else
-            Debug.LogWarning($"{nameof(DeadlineSceneHandler)} could not find a {nameof(GamePanelHandling)} to show the fail panel.", this);
+            Debug.LogWarning(
+                $"{nameof(DeadlineSceneHandler)} could not find a {nameof(GamePanelHandling)} to show the fail panel.",
+                this);
     }
 }

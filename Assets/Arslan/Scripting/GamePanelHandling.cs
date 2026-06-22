@@ -1,246 +1,268 @@
 using System.Collections;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-public class GamePanelHandling : MonoBehaviour
+namespace Arslan.Scripting
 {
-    public static GamePanelHandling Instance;
-    [Header("Panels")]
-    [SerializeField] private GameObject pausePanel;
-    [SerializeField] private GameObject completePanel;
-    [SerializeField] private GameObject failedPanel;
-    [SerializeField] private GameObject LoadingPanel;
-
-    [Header("Different Buttons")]
-    [SerializeField] private Button pauseButton;
-    [SerializeField] private Button resumeButton;
-    [SerializeField] private Button nextButton;
-    [SerializeField] private Button retryButton;
-
-    [Header("Same Buttons")]
-    [SerializeField] private Button[] homeButtons;
-    [SerializeField] private Button[] exitButtons;
-
-    [Header("Scene Settings")]
-    [SerializeField] private string homeSceneName = "MainMenu";
-    [SerializeField] private int NextScene;
-    [SerializeField] private string RestartSceneName = "MainMenu";
-    [SerializeField] private bool pauseOnComplete = true;
-    [SerializeField] private bool pauseOnFailed = true;
-
-    [Header("Camera Script")]
-    [SerializeField] private UnityEvent DisableWorking;
-    [SerializeField] private UnityEvent EnableWorking;
-
-    private bool isPaused;
-    private bool isLevelEnded;
-
-
-    private void Awake()
+    public class GamePanelHandling : MonoBehaviour, IManagerInterface
     {
-        if (!Instance)
-            Instance = this;
-    }
-    private void Start()
-    {
-        HideAllPanels();
-        ResumeTime();
-        AddButtonListeners();
-    }
+        public static GamePanelHandling Instance;
+        [Header("Panels")] [SerializeField] private GameObject pausePanel;
+        [SerializeField] private GameObject completePanel;
+        [SerializeField] private GameObject failedPanel;
 
-    private void OnDestroy()
-    {
-        RemoveButtonListeners();
-    }
+        [Header("Different Buttons")] [SerializeField]
+        private Button pauseButton;
 
-    private void AddButtonListeners()
-    {
-        if (pauseButton != null)
-            pauseButton.onClick.AddListener(PauseLevel);
+        [SerializeField] private Button resumeButton;
+        [SerializeField] private Button nextButton;
+        [SerializeField] private Button retryButton;
 
-        if (resumeButton != null)
-            resumeButton.onClick.AddListener(ResumeLevel);
+        [Header("Same Buttons")] [SerializeField]
+        private Button[] homeButtons;
 
-        if (nextButton != null)
-            nextButton.onClick.AddListener(NextLevel);
+        [SerializeField] private Button[] exitButtons;
 
-        if (retryButton != null)
-            retryButton.onClick.AddListener(RetryLevel);
+        [Header("Scene Settings")] [SerializeField]
+        private string homeSceneName = "MainMenu";
 
-        foreach (Button button in homeButtons)
+        [SerializeField] private int NextScene;
+        [SerializeField] private string RestartSceneName = "MainMenu";
+        [SerializeField] private bool pauseOnComplete = true;
+        [SerializeField] private bool pauseOnFailed = true;
+
+        [Header("Camera Script")] [SerializeField]
+        private UnityEvent DisableWorking;
+
+        [SerializeField] private UnityEvent EnableWorking;
+
+        private bool isPaused;
+        private bool isLevelEnded;
+
+
+        private void Awake()
         {
-            if (button != null)
-                button.onClick.AddListener(GoHome);
+            if (!Instance)
+                Instance = this;
         }
 
-        foreach (Button button in exitButtons)
+        public IEnumerator Initialize()
         {
-            if (button != null)
-                button.onClick.AddListener(ExitGame);
-        }
-    }
+            HideAllPanels();
+            ResumeTime();
+            AddButtonListeners();
 
-    private void RemoveButtonListeners()
-    {
-        if (pauseButton != null)
-            pauseButton.onClick.RemoveListener(PauseLevel);
-
-        if (resumeButton != null)
-            resumeButton.onClick.RemoveListener(ResumeLevel);
-
-        if (nextButton != null)
-            nextButton.onClick.RemoveListener(NextLevel);
-
-        if (retryButton != null)
-            retryButton.onClick.RemoveListener(RetryLevel);
-
-        foreach (Button button in homeButtons)
-        {
-            if (button != null)
-                button.onClick.RemoveListener(GoHome);
+            yield return null;
         }
 
-        foreach (Button button in exitButtons)
+        public IEnumerator PostInitialize()
         {
-            if (button != null)
-                button.onClick.RemoveListener(ExitGame);
+            yield return null;
         }
-    }
 
-    public void PauseLevel()
-    {
-        if (isLevelEnded)
-            return;
+        public IEnumerator SetForGameplay()
+        {
+            yield return null;
+        }
 
-        isPaused = true;
-        PauseTime();
-        SetCameraScriptActive(false);
-        ShowOnlyPanel(pausePanel);
-    }
+        private void OnDestroy()
+        {
+            RemoveButtonListeners();
+        }
 
-    public void ResumeLevel()
-    {
-        if (isLevelEnded)
-            return;
+        private void AddButtonListeners()
+        {
+            if (pauseButton != null)
+                pauseButton.onClick.AddListener(PauseLevel);
 
-        isPaused = false;
-        ResumeTime();
-        SetCameraScriptActive(true);
-        HideAllPanels();
-    }
+            if (resumeButton != null)
+                resumeButton.onClick.AddListener(ResumeLevel);
 
-    public void LevelComplete()
-    {
-        isLevelEnded = true;
-        isPaused = false;
+            if (nextButton != null)
+                nextButton.onClick.AddListener(NextLevel);
 
-        if (pauseOnComplete)
+            if (retryButton != null)
+                retryButton.onClick.AddListener(RetryLevel);
+
+            foreach (Button button in homeButtons)
+            {
+                if (button != null)
+                    button.onClick.AddListener(GoHome);
+            }
+
+            foreach (Button button in exitButtons)
+            {
+                if (button != null)
+                    button.onClick.AddListener(ExitGame);
+            }
+        }
+
+        private void RemoveButtonListeners()
+        {
+            if (pauseButton != null)
+                pauseButton.onClick.RemoveListener(PauseLevel);
+
+            if (resumeButton != null)
+                resumeButton.onClick.RemoveListener(ResumeLevel);
+
+            if (nextButton != null)
+                nextButton.onClick.RemoveListener(NextLevel);
+
+            if (retryButton != null)
+                retryButton.onClick.RemoveListener(RetryLevel);
+
+            foreach (Button button in homeButtons)
+            {
+                if (button != null)
+                    button.onClick.RemoveListener(GoHome);
+            }
+
+            foreach (Button button in exitButtons)
+            {
+                if (button != null)
+                    button.onClick.RemoveListener(ExitGame);
+            }
+        }
+
+        public void PauseLevel()
+        {
+            if (isLevelEnded)
+                return;
+
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
+
+            isPaused = true;
             PauseTime();
+            SetCameraScriptActive(false);
+            ShowOnlyPanel(pausePanel);
+        }
 
-        SetCameraScriptActive(false);
-        ShowOnlyPanel(completePanel);
-    }
+        public void ResumeLevel()
+        {
+            if (isLevelEnded)
+                return;
 
-    public void LevelFailed()
-    {
-        isLevelEnded = true;
-        isPaused = false;
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
 
-        if (pauseOnFailed)
-            PauseTime();
+            isPaused = false;
+            ResumeTime();
+            SetCameraScriptActive(true);
+            HideAllPanels();
+        }
 
-        SetCameraScriptActive(false);
-        ShowOnlyPanel(failedPanel);
-    }
+        public void LevelComplete()
+        {
+            isLevelEnded = true;
+            isPaused = false;
 
-    public void NextLevel()
-    {
-        ResumeTime();
+            if (pauseOnComplete)
+                PauseTime();
+
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.CompletedSfx);
+
+            SetCameraScriptActive(false);
+            ShowOnlyPanel(completePanel);
+        }
+
+        public void LevelFailed()
+        {
+            isLevelEnded = true;
+            isPaused = false;
+
+            if (pauseOnFailed)
+                PauseTime();
+
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.FailedSfx);
+
+            SetCameraScriptActive(false);
+            ShowOnlyPanel(failedPanel);
+        }
+
+        public void NextLevel()
+        {
+            ResumeTime();
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(NextScene,LoadSceneMode.Single,true,1.5f);
+        }
 
 
-        StartCoroutine(LoadingScreen(NextScene));
-    }
+        public void RetryLevel()
+        {
+            ResumeTime();
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex,LoadSceneMode.Single,true,1.5f);
+        }
 
-    IEnumerator LoadingScreen(int values)
-    {
-        LoadingPanel.SetActive(true);
-        yield return new WaitForSeconds(2f);
-            SceneManager.LoadScene(values);
-    }
+        public void GoHome()
+        {
+            ResumeTime();
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BackBtnSfx);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(0,LoadSceneMode.Single,true,1.5f);
+        }
 
-    public void RetryLevel()
-    {
-        ResumeTime();
-        LoadingPanel.SetActive(true);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-    }
+        public void ExitGame()
+        {
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BackBtnSfx);
 
-    public void GoHome()
-    {
-        ResumeTime();
-
-        StartCoroutine(LoadingScreen(0));
-    }
-
-    public void ExitGame()
-    {
-        ResumeTime();
-        Application.Quit();
+            ResumeTime();
+            Application.Quit();
 
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
+            UnityEditor.EditorApplication.isPlaying = false;
 #endif
-    }
+        }
 
-    private void ShowOnlyPanel(GameObject panelToShow)
-    {
-        SetPanelActive(pausePanel, pausePanel == panelToShow);
-        SetPanelActive(completePanel, completePanel == panelToShow);
-        SetPanelActive(failedPanel, failedPanel == panelToShow);
-    }
+        private void ShowOnlyPanel(GameObject panelToShow)
+        {
+            SetPanelActive(pausePanel, pausePanel == panelToShow);
+            SetPanelActive(completePanel, completePanel == panelToShow);
+            SetPanelActive(failedPanel, failedPanel == panelToShow);
+        }
 
-    private void HideAllPanels()
-    {
-        SetPanelActive(pausePanel, false);
-        SetPanelActive(completePanel, false);
-        SetPanelActive(failedPanel, false);
-    }
+        private void HideAllPanels()
+        {
+            SetPanelActive(pausePanel, false);
+            SetPanelActive(completePanel, false);
+            SetPanelActive(failedPanel, false);
+        }
 
-    private void SetPanelActive(GameObject panel, bool isActive)
-    {
-        if (panel != null)
-            panel.SetActive(isActive);
-    }
+        private void SetPanelActive(GameObject panel, bool isActive)
+        {
+            if (panel != null)
+                panel.SetActive(isActive);
+        }
 
-    private void PauseTime()
-    {
-        Time.timeScale = 0f;
-    }
+        private void PauseTime()
+        {
+            Time.timeScale = 0f;
+        }
 
-    private void ResumeTime()
-    {
-        Time.timeScale = 1f;
-    }
+        private void ResumeTime()
+        {
+            Time.timeScale = 1f;
+        }
 
-    private void SetCameraScriptActive(bool isActive)
-    {
-        if (!isActive)
-            DisableWorking?.Invoke();
-        else
-            EnableWorking?.Invoke();
-    }
+        private void SetCameraScriptActive(bool isActive)
+        {
+            if (!isActive)
+                DisableWorking?.Invoke();
+            else
+                EnableWorking?.Invoke();
+        }
 
-   
 
-    public bool IsPaused()
-    {
-        return isPaused;
-    }
+        public bool IsPaused()
+        {
+            return isPaused;
+        }
 
-    public bool IsLevelEnded()
-    {
-        return isLevelEnded;
+        public bool IsLevelEnded()
+        {
+            return isLevelEnded;
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using Arslan.Scripting;
 using GlassSystem.Scripts;
 using Sirenix.OdinInspector;
 using TMPro;
@@ -8,7 +9,7 @@ using UnityEngine.UI;
 
 namespace DefaultNamespace
 {
-    public class FilterSceneHandler : MonoBehaviour
+    public class FilterSceneHandler : MonoBehaviour, IManagerInterface
     {
         [TitleGroup("Refs"), SerializeField] private GlassPanel glassPanel;
         [TitleGroup("Refs"), SerializeField] private GamePanelHandling gamePanelHandling;
@@ -37,12 +38,13 @@ namespace DefaultNamespace
         private string _enteredName = string.Empty;
         private bool _levelCompleteShown;
 
-        private void Awake()
+
+        public IEnumerator Initialize()
         {
             if (glassPanel == null)
             {
                 Debug.LogError($"{nameof(FilterSceneHandler)} needs a {nameof(GlassPanel)} reference.", this);
-                return;
+                yield break;
             }
 
             glassPanel.SetCanBreak(false);
@@ -50,10 +52,11 @@ namespace DefaultNamespace
 
             if (gamePanelHandling == null)
                 gamePanelHandling = GamePanelHandling.Instance;
+
+            yield return null;
         }
 
-
-        private void Start()
+        public IEnumerator PostInitialize()
         {
             if (inputAreaContinueBtn != null)
                 inputAreaContinueBtn.onClick.AddListener(InputAreaContinueBtn);
@@ -63,6 +66,13 @@ namespace DefaultNamespace
 
             SetInputText(string.Empty);
             SetContinueButtonState(false);
+
+            yield return null;
+        }
+
+        public IEnumerator SetForGameplay()
+        {
+            yield return null;
         }
 
         private void OnDestroy()
@@ -131,6 +141,8 @@ namespace DefaultNamespace
 
             if (inputTxtPanelObj != null)
                 inputTxtPanelObj.SetActive(false);
+
+            SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
         }
 
         private void SetInputText(string input)

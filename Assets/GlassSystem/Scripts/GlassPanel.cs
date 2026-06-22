@@ -39,7 +39,7 @@ namespace GlassSystem.Scripts
         [TitleGroup("Device Height Scale"), SerializeField, Range(0.1f, 1.5f)]
         private float deviceHeightFillPercent = 1f;
 
-        [TitleGroup("Gameplay View"), SerializeField]
+        [TitleGroup("Game`play View"), SerializeField]
         private bool limitGameplayToCameraView = true;
 
         [TitleGroup("Gameplay View"), SerializeField, Range(-0.25f, 0.25f)]

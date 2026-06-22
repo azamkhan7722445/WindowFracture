@@ -1,44 +1,53 @@
 using System.Collections;
+using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(Renderer))]
-public class Paint_Effect : MonoBehaviour
+public class Paint_Effect : MonoBehaviour, IManagerInterface
 {
-    [Header("Textures")]
-    [Tooltip("Assign a white crumpled paper texture here.")]
+    [Header("Textures")] [Tooltip("Assign a white crumpled paper texture here.")]
     public Texture2D paperTexture;
 
     [Tooltip("Resolution of the paint RenderTexture (width = height).")]
     public int canvasResolution = 1024;
 
-    [Header("Brush")]
-    [Range(0.005f, 0.15f)] public float brushSize = 0.03f;
+    [Header("Brush")] [Range(0.005f, 0.15f)]
+    public float brushSize = 0.03f;
+
     public Color brushColor = Color.black;
     [Range(0f, 1f)] public float brushHardness = 0.8f;
 
     [Tooltip("Optional custom brush shape. Drag any greyscale texture here - white = full paint, black = no paint.")]
     public Texture2D brushTexture;
 
-    [Header("Brush Shader")]
-    [Tooltip("Drag BrushStampShader here so it is guaranteed included in builds.")]
+    [Header("Brush Shader")] [Tooltip("Drag BrushStampShader here so it is guaranteed included in builds.")]
     public Shader brushStampShader;
 
-    [Header("Sounds Optional")]
-    [Tooltip("Played in a loop while the user is painting.")]
+    [Header("Sounds Optional")] [Tooltip("Played in a loop while the user is painting.")]
     public AudioClip paintSound;
 
     [Range(0f, 1f)] public float soundVolume = 0.7f;
 
-    [Header("Level Complete")]
-    [SerializeField, Range(0f, 100f)] private float levelCompletePercent = 90f;
+    [Header("Camera Fit")] [SerializeField]
+    private Camera targetCamera;
+
+    [SerializeField] private float distanceFromCamera = 5f;
+    [SerializeField] private bool scaleToDeviceHeightOnStart = true;
+    [SerializeField, Range(0.1f, 1.5f)] private float deviceHeightFillPercent = 1f;
+    [SerializeField] private bool limitCompletionToCameraView = true;
+    [SerializeField, Range(-0.25f, 0.25f)] private float gameplayViewportMargin = 0.02f;
+
+    [Header("Level Complete")] [SerializeField, Range(0f, 100f)]
+    private float levelCompletePercent = 90f;
+
     [SerializeField] private GameObject levelCompleteUI;
 
-    [Tooltip("How often paint percentage is checked while painting.")]
-    [SerializeField] private float percentageCheckInterval = 0.25f;
+    [Tooltip("How often paint percentage is checked while painting.")] [SerializeField]
+    private float percentageCheckInterval = 0.25f;
 
-    [Tooltip("Pixels with alpha above this value count as painted.")]
-    [SerializeField, Range(0f, 1f)] private float paintedAlphaThreshold = 0.1f;
+    [Tooltip("Pixels with alpha above this value count as painted.")] [SerializeField, Range(0f, 1f)]
+    private float paintedAlphaThreshold = 0.1f;
 
     public float PaintedPercentage { get; private set; }
 
@@ -56,6 +65,8 @@ public class Paint_Effect : MonoBehaviour
     Texture2D _percentageReadTexture;
     float _nextPercentageCheckTime;
     bool _levelCompleteShown;
+    int[] _visiblePixelIndices;
+    int _visiblePixelCount;
 
     static readonly int ID_PaintTex = Shader.PropertyToID("_PaintTexture");
     static readonly int ID_BrushUV = Shader.PropertyToID("_BrushUV");
@@ -67,7 +78,7 @@ public class Paint_Effect : MonoBehaviour
     static readonly int ID_BrushTex = Shader.PropertyToID("_BrushTexture");
     static readonly int ID_UseBrushTx = Shader.PropertyToID("_UseBrushTex");
 
-    void Start()
+    public IEnumerator Initialize()
     {
         _cam = Camera.main;
 
@@ -81,6 +92,11 @@ public class Paint_Effect : MonoBehaviour
         var mf = GetComponent<MeshFilter>();
         if (mf != null && _col.sharedMesh == null)
             _col.sharedMesh = mf.sharedMesh;
+
+        if (scaleToDeviceHeightOnStart)
+            ScaleToDeviceHeight();
+
+        BuildVisiblePixelCache();
 
         _paintRT = CreateRT(canvasResolution);
         _tempRT = CreateRT(canvasResolution);
@@ -105,9 +121,10 @@ public class Paint_Effect : MonoBehaviour
         var brushShader = brushStampShader != null ? brushStampShader : Shader.Find("Hidden/BrushStamp");
         if (brushShader == null)
         {
-            Debug.LogError("[Paint_Effect] BrushStamp shader not found. Assign it to the 'Brush Stamp Shader' field in the Inspector.");
+            Debug.LogError(
+                "[Paint_Effect] BrushStamp shader not found. Assign it to the 'Brush Stamp Shader' field in the Inspector.");
             enabled = false;
-            return;
+            yield break;
         }
 
         _brushMat = new Material(brushShader)
@@ -120,6 +137,19 @@ public class Paint_Effect : MonoBehaviour
         _audioSource.playOnAwake = false;
         _audioSource.volume = soundVolume;
         _audioSource.spatialBlend = 0f;
+
+
+        yield return null;
+    }
+
+    public IEnumerator PostInitialize()
+    {
+        yield return null;
+    }
+
+    public IEnumerator SetForGameplay()
+    {
+        yield return null;
     }
 
     bool GetInputPosition(out Vector2 screenPos, out int fingerId)
@@ -137,6 +167,7 @@ public class Paint_Effect : MonoBehaviour
                     fingerId = -1;
                     return false;
                 }
+
                 screenPos = touch.position;
                 fingerId = touch.fingerId;
                 return true;
@@ -151,6 +182,7 @@ public class Paint_Effect : MonoBehaviour
                 fingerId = -1;
                 return false;
             }
+
             screenPos = Input.mousePosition;
             fingerId = -1;
             return true;
@@ -163,7 +195,7 @@ public class Paint_Effect : MonoBehaviour
 
     void Update()
     {
-        if (_brushMat == null || _cam == null)
+        if (_brushMat == null || _cam == null || _levelCompleteShown)
             return;
 
         if (!GetInputPosition(out Vector2 inputPos, out _) || !CanShoot)
@@ -279,17 +311,163 @@ public class Paint_Effect : MonoBehaviour
         int paintedPixels = 0;
         byte alphaLimit = (byte)(paintedAlphaThreshold * 255f);
 
-        for (int i = 0; i < pixels.Length; i++)
+        if (_visiblePixelIndices == null)
         {
-            if (pixels[i].a > alphaLimit)
-                paintedPixels++;
-        }
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                if (pixels[i].a > alphaLimit)
+                    paintedPixels++;
+            }
 
-        PaintedPercentage = (paintedPixels / (float)pixels.Length) * 100f;
+            PaintedPercentage = (paintedPixels / (float)pixels.Length) * 100f;
+        }
+        else
+        {
+            for (int i = 0; i < _visiblePixelCount; i++)
+            {
+                if (pixels[_visiblePixelIndices[i]].a > alphaLimit)
+                    paintedPixels++;
+            }
+
+            PaintedPercentage = _visiblePixelCount > 0
+                ? (paintedPixels / (float)_visiblePixelCount) * 100f
+                : 0f;
+        }
 
         Debug.Log($"Paint completed: {PaintedPercentage:0.0}%");
 
         CheckLevelComplete();
+    }
+
+    [Button]
+    public void ScaleToDeviceHeight()
+    {
+        Camera camera = GetTargetCamera();
+        MeshRenderer meshRenderer = GetComponent<MeshRenderer>();
+
+        if (camera == null || meshRenderer == null)
+            return;
+
+        float currentWorldHeight = meshRenderer.bounds.size.y;
+        if (currentWorldHeight <= 0f)
+            return;
+
+        Vector3 localScale = transform.localScale;
+        float scaleMultiplier = GetGameplayWorldHeight(camera) / currentWorldHeight;
+        float uniformLocalScale = localScale.y * scaleMultiplier;
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            UnityEditor.Undo.RecordObject(transform, "Scale Paint Plane To Device Height");
+#endif
+
+        transform.localScale = new Vector3(uniformLocalScale, uniformLocalScale, localScale.z);
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            UnityEditor.EditorUtility.SetDirty(transform);
+#endif
+
+        if (Application.isPlaying)
+            BuildVisiblePixelCache();
+    }
+
+    void BuildVisiblePixelCache()
+    {
+        if (!limitCompletionToCameraView)
+        {
+            _visiblePixelIndices = null;
+            _visiblePixelCount = canvasResolution * canvasResolution;
+            return;
+        }
+
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        int totalPixels = canvasResolution * canvasResolution;
+        var indices = new int[totalPixels];
+        int count = 0;
+
+        for (int y = 0; y < canvasResolution; y++)
+        {
+            for (int x = 0; x < canvasResolution; x++)
+            {
+                Vector2 uv = new Vector2(
+                    (x + 0.5f) / canvasResolution,
+                    (y + 0.5f) / canvasResolution
+                );
+
+                if (!IsUvInGameplayView(uv, meshFilter))
+                    continue;
+
+                indices[count++] = y * canvasResolution + x;
+            }
+        }
+
+        _visiblePixelIndices = new int[count];
+        System.Array.Copy(indices, _visiblePixelIndices, count);
+        _visiblePixelCount = count;
+    }
+
+    Camera GetTargetCamera()
+    {
+        return targetCamera != null ? targetCamera : Camera.main;
+    }
+
+    float GetGameplayWorldHeight(Camera camera)
+    {
+        float visibleHeight = GetVisibleWorldHeight(camera);
+        float margin = Mathf.Clamp(gameplayViewportMargin, -0.45f, 0.45f);
+        float usableHeight = visibleHeight * (1f - margin * 2f);
+
+        return usableHeight * deviceHeightFillPercent;
+    }
+
+    float GetVisibleWorldHeight(Camera camera)
+    {
+        if (camera == null)
+            return Mathf.Max(transform.lossyScale.y, 0f);
+
+        float depth = Vector3.Dot(transform.position - camera.transform.position, camera.transform.forward);
+        if (depth <= camera.nearClipPlane)
+            depth = Mathf.Max(distanceFromCamera, camera.nearClipPlane + 0.1f);
+
+        return camera.orthographic
+            ? camera.orthographicSize * 2f
+            : 2f * depth * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+    }
+
+    Vector3 UvToWorld(Vector2 uv, MeshFilter meshFilter)
+    {
+        if (meshFilter == null || meshFilter.sharedMesh == null)
+            return transform.position;
+
+        Bounds localBounds = meshFilter.sharedMesh.bounds;
+        Vector3 localPoint = new Vector3(
+            Mathf.Lerp(localBounds.min.x, localBounds.max.x, uv.x),
+            Mathf.Lerp(localBounds.min.y, localBounds.max.y, uv.y),
+            localBounds.center.z
+        );
+
+        return transform.TransformPoint(localPoint);
+    }
+
+    bool IsUvInGameplayView(Vector2 uv, MeshFilter meshFilter)
+    {
+        if (!limitCompletionToCameraView)
+            return true;
+
+        Camera camera = GetTargetCamera();
+        if (camera == null)
+            return true;
+
+        Vector3 viewportPoint = camera.WorldToViewportPoint(UvToWorld(uv, meshFilter));
+        if (viewportPoint.z <= 0f)
+            return false;
+
+        float margin = Mathf.Clamp(gameplayViewportMargin, -0.45f, 0.45f);
+        return viewportPoint.x >= margin
+               && viewportPoint.x <= 1f - margin
+               && viewportPoint.y >= margin
+               && viewportPoint.y <= 1f - margin;
     }
 
     void CheckLevelComplete()
@@ -308,8 +486,19 @@ public class Paint_Effect : MonoBehaviour
     {
         Debug.Log("Level Complete");
 
+        StopPainting();
+
+        SoundManager.Instance.PlayAudio(SoundManager.Instance.CompletedSfx);
+        
         if (levelCompleteUI != null)
             levelCompleteUI.SetActive(true);
+    }
+
+    void StopPainting()
+    {
+        CanShoot = false;
+        StopBrushSound();
+        _wasPainting = false;
     }
 
     void OnDestroy()
@@ -348,13 +537,21 @@ public class Paint_Effect : MonoBehaviour
         GL.Clear(true, true, Color.clear);
         RenderTexture.active = previous;
     }
+
     private bool CanShoot = true;
 
-    public IEnumerator ActiveDeplay(float time = 0, bool _canShoot = false)
+    public IEnumerator ActiveDeplay(float time = 0, bool canShoot = false)
     {
         yield return new WaitForSeconds(time);
-        CanShoot = _canShoot;
+        if (canShoot && _levelCompleteShown)
+            yield break;
+        CanShoot = canShoot;
     }
 
-    public void SetAction(bool canShoot) => StartCoroutine(ActiveDeplay(canShoot ? 0.5f : 0, canShoot));
+    public void SetAction(bool canShoot)
+    {
+        if (canShoot && _levelCompleteShown)
+            return;
+        StartCoroutine(ActiveDeplay(canShoot ? 0.5f : 0, canShoot));
+    }
 }

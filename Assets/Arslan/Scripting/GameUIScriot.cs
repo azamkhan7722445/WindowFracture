@@ -9,10 +9,4 @@ public class GameUIScriot : MonoBehaviour
         if(!Instance)
             Instance = new GameUIScriot();
     }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
 }
