@@ -30,7 +30,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 31cc5cac5e2fccd44b1c55486591c227, type: 3}
+        m_Texture: {fileID: 2800000, guid: a1e8d3f6f10fe6342882e31565a37c45, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -57,6 +57,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _HeightMap:
+        m_Texture: {fileID: 2800000, guid: a1e8d3f6f10fe6342882e31565a37c45, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _METALNESS_MAP:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -73,8 +77,12 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _NoiseMap:
+        m_Texture: {fileID: 2800000, guid: 35587bf6f2e09ff45a475d623f1eaed0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _NormalMap:
-        m_Texture: {fileID: 2800000, guid: 72d6e7e2485ed7d4193f11bb0feb4798, type: 3}
+        m_Texture: {fileID: 2800000, guid: 203cf91de7ff63149b25d57aac563fb7, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -137,9 +145,13 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _HeightStrength: 0.008
     - _METALNESS: 0
-    - _Metallic: 0.313
-    - _NormalStrength: 1.24
+    - _Metallic: 0
+    - _NoiseRoughness: 0.446
+    - _NoiseScale: 8
+    - _NoiseStrength: 0
+    - _NormalStrength: 2
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
@@ -148,13 +160,14 @@ Material:
     - _ReflectionStrength: 1
     - _SPECULAR_IOR: 1.5
     - _SPECULAR_ROUGHNESS: 0
-    - _Smoothness: 0.851
+    - _Smoothness: 0.429
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _TextStrength: 1
+    - _UseNoiseMap: 0
     - _UseTextMapColor: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1

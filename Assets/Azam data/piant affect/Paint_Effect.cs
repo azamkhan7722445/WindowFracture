@@ -1,4 +1,5 @@
 using System.Collections;
+using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -6,6 +7,40 @@ using UnityEngine.EventSystems;
 [RequireComponent(typeof(Renderer))]
 public class Paint_Effect : MonoBehaviour, IManagerInterface
 {
+    public event Action<PaintInputData> PaintInputChanged;
+
+    public struct PaintInputData
+    {
+        public bool IsPainting { get; }
+        public int FingerId { get; }
+        public Vector2 ScreenPosition { get; }
+        public Vector2 UV { get; }
+        public Vector2 ScreenDelta { get; }
+        public Vector2 UVDelta { get; }
+        public float ScreenSpeed { get; }
+        public float UVSpeed { get; }
+
+        public PaintInputData(
+            bool isPainting,
+            int fingerId,
+            Vector2 screenPosition,
+            Vector2 uv,
+            Vector2 screenDelta,
+            Vector2 uvDelta,
+            float screenSpeed,
+            float uvSpeed)
+        {
+            IsPainting = isPainting;
+            FingerId = fingerId;
+            ScreenPosition = screenPosition;
+            UV = uv;
+            ScreenDelta = screenDelta;
+            UVDelta = uvDelta;
+            ScreenSpeed = screenSpeed;
+            UVSpeed = uvSpeed;
+        }
+    }
+
     [Header("Textures")] [Tooltip("Assign a white crumpled paper texture here.")]
     public Texture2D paperTexture;
 
@@ -23,11 +58,6 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
     [Header("Brush Shader")] [Tooltip("Drag BrushStampShader here so it is guaranteed included in builds.")]
     public Shader brushStampShader;
-
-    [Header("Sounds Optional")] [Tooltip("Played in a loop while the user is painting.")]
-    public AudioClip paintSound;
-
-    [Range(0f, 1f)] public float soundVolume = 0.7f;
 
     [Header("Camera Fit")] [SerializeField]
     private Camera targetCamera;
@@ -60,7 +90,8 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
     bool _wasPainting;
     Vector2 _prevUV;
-    AudioSource _audioSource;
+    Vector2 _prevScreenPosition;
+    int _activeFingerId = -1;
 
     Texture2D _percentageReadTexture;
     float _nextPercentageCheckTime;
@@ -132,13 +163,6 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
             hideFlags = HideFlags.HideAndDontSave
         };
 
-        _audioSource = gameObject.AddComponent<AudioSource>();
-        _audioSource.loop = true;
-        _audioSource.playOnAwake = false;
-        _audioSource.volume = soundVolume;
-        _audioSource.spatialBlend = 0f;
-
-
         yield return null;
     }
 
@@ -198,10 +222,9 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
         if (_brushMat == null || _cam == null || _levelCompleteShown)
             return;
 
-        if (!GetInputPosition(out Vector2 inputPos, out _) || !CanShoot)
+        if (!GetInputPosition(out Vector2 inputPos, out int fingerId) || !CanShoot)
         {
-            StopBrushSound();
-            _wasPainting = false;
+            EndPaintInput();
             return;
         }
 
@@ -209,14 +232,25 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
         if (!Physics.Raycast(ray, out RaycastHit hit) || hit.collider != _col)
         {
-            StopBrushSound();
-            _wasPainting = false;
+            EndPaintInput();
             return;
         }
 
-        PlayBrushSound();
-
         Vector2 uv = hit.textureCoord;
+        Vector2 screenDelta = _wasPainting ? inputPos - _prevScreenPosition : Vector2.zero;
+        Vector2 uvDelta = _wasPainting ? uv - _prevUV : Vector2.zero;
+        float deltaTime = Mathf.Max(Time.deltaTime, Mathf.Epsilon);
+
+        PaintInputChanged?.Invoke(new PaintInputData(
+            true,
+            fingerId,
+            inputPos,
+            uv,
+            screenDelta,
+            uvDelta,
+            screenDelta.magnitude / deltaTime,
+            uvDelta.magnitude / deltaTime
+        ));
 
         if (_wasPainting)
             StampAlongPath(_prevUV, uv);
@@ -224,31 +258,31 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
             Stamp(uv);
 
         _prevUV = uv;
+        _prevScreenPosition = inputPos;
+        _activeFingerId = fingerId;
         _wasPainting = true;
 
         CheckPaintPercentageTimer();
     }
 
-    void PlayBrushSound()
+    void EndPaintInput()
     {
-        if (_audioSource == null || paintSound == null)
-        {
-            StopBrushSound();
+        if (!_wasPainting)
             return;
-        }
 
-        if (_audioSource.clip != paintSound || !_audioSource.isPlaying)
-        {
-            _audioSource.clip = paintSound;
-            _audioSource.volume = soundVolume;
-            _audioSource.Play();
-        }
-    }
+        PaintInputChanged?.Invoke(new PaintInputData(
+            false,
+            _activeFingerId,
+            _prevScreenPosition,
+            _prevUV,
+            Vector2.zero,
+            Vector2.zero,
+            0f,
+            0f
+        ));
 
-    void StopBrushSound()
-    {
-        if (_audioSource != null && _audioSource.isPlaying)
-            _audioSource.Stop();
+        _wasPainting = false;
+        _activeFingerId = -1;
     }
 
     void StampAlongPath(Vector2 from, Vector2 to)
@@ -489,7 +523,7 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
         StopPainting();
 
         SoundManager.Instance.PlayAudio(SoundManager.Instance.CompletedSfx);
-        
+
         if (levelCompleteUI != null)
             levelCompleteUI.SetActive(true);
     }
@@ -497,8 +531,7 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
     void StopPainting()
     {
         CanShoot = false;
-        StopBrushSound();
-        _wasPainting = false;
+        EndPaintInput();
     }
 
     void OnDestroy()

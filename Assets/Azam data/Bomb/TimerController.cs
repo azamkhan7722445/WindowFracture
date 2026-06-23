@@ -24,7 +24,7 @@ namespace Azam_data.Bomb
         [Header("Camera Shake")] public Camera targetCamera;
         [Range(0f, 0.5f)] public float cameraShakeMagnitude = 0.05f;
         [Range(0f, 20f)] public float cameraShakeSpeed = 8f;
-        [Range(1f, 10f)] public float blastShakeMultiplier = 8f;
+        [Range(1f, 100f)] public float blastShakeMultiplier = 8f;
 
         // ── public hooks for BombPostFX ────────────────────────────────
         public System.Action OnBlast;

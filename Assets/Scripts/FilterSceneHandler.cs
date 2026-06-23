@@ -35,6 +35,15 @@ namespace DefaultNamespace
         [TitleGroup("Input Gate"), SerializeField]
         private Button inputAreaContinueBtn;
 
+        [TitleGroup("Wall Material"), SerializeField]
+        private Renderer wallRenderer;
+
+        [TitleGroup("Wall Material"), SerializeField, PreviewField]
+        private Texture2D heightMap;
+
+        [TitleGroup("Wall Material"), SerializeField, PreviewField]
+        private Texture2D noiseMap;
+
         private string _enteredName = string.Empty;
         private bool _levelCompleteShown;
 
@@ -46,6 +55,8 @@ namespace DefaultNamespace
                 Debug.LogError($"{nameof(FilterSceneHandler)} needs a {nameof(GlassPanel)} reference.", this);
                 yield break;
             }
+
+            ApplyWallMaterialSettings();
 
             glassPanel.SetCanBreak(false);
             glassPanel.OnRemainingHealthUpdated += OnRemainingHealthUpdated;
@@ -161,5 +172,32 @@ namespace DefaultNamespace
         }
 
         #endregion
+
+        private void ApplyWallMaterialSettings()
+        {
+            if (heightMap == null && noiseMap == null)
+                return;
+
+            Renderer renderer = wallRenderer;
+            if (renderer == null && glassPanel != null)
+                renderer = glassPanel.GetComponent<Renderer>();
+
+            if (renderer == null)
+            {
+                Debug.LogWarning($"{nameof(FilterSceneHandler)} could not find a wall renderer for wall material settings.", this);
+                return;
+            }
+
+            Material material = renderer.material;
+
+            if (heightMap != null)
+                material.SetTexture("_HeightMap", heightMap);
+
+            if (noiseMap != null)
+            {
+                material.SetTexture("_NoiseMap", noiseMap);
+                material.SetFloat("_UseNoiseMap", 1f);
+            }
+        }
     }
 }

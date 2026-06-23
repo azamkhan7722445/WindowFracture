@@ -247,7 +247,7 @@ MonoBehaviour:
   targetCamera: {fileID: 1374336863}
   cameraShakeMagnitude: 0.05
   cameraShakeSpeed: 8
-  blastShakeMultiplier: 8
+  blastShakeMultiplier: 73.3
 --- !u!82 &33417609
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1260,7 +1260,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10e93c5aa2a5f4340a8a53af783af337, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlassSystem.Sample.DemoGun
-  impactForce: 1
+  impactForce: 2
   Retry: 3
 --- !u!114 &1374336867
 MonoBehaviour:

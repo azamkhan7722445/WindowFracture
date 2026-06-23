@@ -6,6 +6,13 @@ Shader "Custom/Wall Text Blend"
         _BaseColor("Base Color", Color) = (0.6, 0.6, 0.6, 1)
         _NormalMap("Normal Map", 2D) = "bump" {}
         _NormalStrength("Normal Strength", Range(0, 2)) = 1
+        _HeightMap("Height Map", 2D) = "gray" {}
+        _HeightStrength("Height Strength", Range(0, 0.1)) = 0
+        _NoiseScale("Noise Scale", Float) = 8
+        _NoiseStrength("Noise Strength", Range(0, 1)) = 0.15
+        _NoiseRoughness("Noise Roughness", Range(0, 1)) = 0.2
+        _NoiseMap("Noise Map", 2D) = "gray" {}
+        _UseNoiseMap("Use Noise Map", Range(0, 1)) = 0
         _TextMap("Text Render Texture", 2D) = "black" {}
         _TextColor("Text Color", Color) = (0, 0, 0, 1)
         _UseTextMapColor("Use Render Texture Color", Range(0, 1)) = 1
@@ -47,16 +54,27 @@ Shader "Custom/Wall Text Blend"
             SAMPLER(sampler_BaseMap);
             TEXTURE2D(_NormalMap);
             SAMPLER(sampler_NormalMap);
+            TEXTURE2D(_HeightMap);
+            SAMPLER(sampler_HeightMap);
+            TEXTURE2D(_NoiseMap);
+            SAMPLER(sampler_NoiseMap);
             TEXTURE2D(_TextMap);
             SAMPLER(sampler_TextMap);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
                 float4 _NormalMap_ST;
+                float4 _HeightMap_ST;
+                float4 _NoiseMap_ST;
                 float4 _TextMap_ST;
                 half4 _BaseColor;
                 half4 _TextColor;
                 half _NormalStrength;
+                half _HeightStrength;
+                half _NoiseScale;
+                half _NoiseStrength;
+                half _NoiseRoughness;
+                half _UseNoiseMap;
                 half _UseTextMapColor;
                 half _TextStrength;
                 half _ReflectionStrength;
@@ -79,11 +97,32 @@ Shader "Custom/Wall Text Blend"
                 float2 baseUV : TEXCOORD1;
                 float2 textUV : TEXCOORD2;
                 float2 normalUV : TEXCOORD3;
-                float3 tangentWS : TEXCOORD4;
-                float3 bitangentWS : TEXCOORD5;
-                float3 positionWS : TEXCOORD6;
-                half fogFactor : TEXCOORD7;
+                float2 heightUV : TEXCOORD4;
+                float3 tangentWS : TEXCOORD5;
+                float3 bitangentWS : TEXCOORD6;
+                float3 positionWS : TEXCOORD7;
+                half fogFactor : TEXCOORD8;
             };
+
+            float ValueNoise(float2 uv)
+            {
+                float2 i = floor(uv);
+                float2 f = frac(uv);
+                f = f * f * (3.0 - 2.0 * f);
+
+                float a = frac(sin(dot(i, float2(127.1, 311.7))) * 43758.5453);
+                float b = frac(sin(dot(i + float2(1.0, 0.0), float2(127.1, 311.7))) * 43758.5453);
+                float c = frac(sin(dot(i + float2(0.0, 1.0), float2(127.1, 311.7))) * 43758.5453);
+                float d = frac(sin(dot(i + float2(1.0, 1.0), float2(127.1, 311.7))) * 43758.5453);
+
+                return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+            }
+
+            float2 ApplyParallaxOffset(float2 uv, float height, float3 viewDirTS)
+            {
+                float2 offset = viewDirTS.xy / max(viewDirTS.z, 0.25) * (height - 0.5) * _HeightStrength;
+                return uv - offset;
+            }
 
             Varyings vert(Attributes input)
             {
@@ -96,6 +135,7 @@ Shader "Custom/Wall Text Blend"
                 output.baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.textUV = TRANSFORM_TEX(input.uv, _TextMap);
                 output.normalUV = TRANSFORM_TEX(input.uv, _NormalMap);
+                output.heightUV = TRANSFORM_TEX(input.uv, _HeightMap);
 
                 float3 tangentWS = TransformObjectToWorldDir(input.tangentOS.xyz);
                 if (dot(tangentWS, tangentWS) < 0.0001)
@@ -114,26 +154,46 @@ Shader "Custom/Wall Text Blend"
 
             half4 frag(Varyings input) : SV_Target
             {
-                half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV) * _BaseColor;
+                half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                half3x3 tangentToWorld = half3x3(input.tangentWS, input.bitangentWS, input.normalWS);
+                half3 viewDirTS = mul(transpose(tangentToWorld), viewDirWS);
+
+                half height = SAMPLE_TEXTURE2D(_HeightMap, sampler_HeightMap, input.heightUV).r;
+                float2 parallaxUV = ApplyParallaxOffset(input.baseUV, height, viewDirTS);
+                float2 parallaxNormalUV = ApplyParallaxOffset(input.normalUV, height, viewDirTS);
+
+                half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, parallaxUV) * _BaseColor;
                 half4 textSample = SAMPLE_TEXTURE2D(_TextMap, sampler_TextMap, input.textUV);
 
                 half textBrightness = max(max(textSample.r, textSample.g), textSample.b);
                 half textMask = saturate(max(textSample.a, textBrightness) * _TextStrength);
 
+                half noise = ValueNoise(parallaxUV * _NoiseScale);
+                half textureNoise = SAMPLE_TEXTURE2D(_NoiseMap, sampler_NoiseMap, parallaxUV * _NoiseScale).r;
+                noise = lerp(noise, textureNoise, _UseNoiseMap);
+                half noiseBlend = lerp(1.0h, noise, _NoiseStrength);
+                baseSample.rgb *= noiseBlend;
+
                 half3 finalTextColor = lerp(_TextColor.rgb, textSample.rgb, _UseTextMapColor);
                 half3 albedo = lerp(baseSample.rgb, finalTextColor, textMask);
 
-                half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.normalUV), _NormalStrength);
+                half3 normalTS = UnpackNormalScale(
+                    SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, parallaxNormalUV),
+                    _NormalStrength
+                );
                 half3 normalWS = normalize(
                     normalTS.x * input.tangentWS +
                     normalTS.y * input.bitangentWS +
                     normalTS.z * input.normalWS
                 );
+
+                half smoothness = _Smoothness * lerp(1.0h, noise, _NoiseRoughness);
+
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
                 surfaceData.specular = half3(0, 0, 0);
                 surfaceData.metallic = _Metallic;
-                surfaceData.smoothness = _Smoothness;
+                surfaceData.smoothness = smoothness;
                 surfaceData.normalTS = normalTS;
                 surfaceData.emission = 0;
                 surfaceData.occlusion = saturate(_ReflectionStrength);
@@ -145,14 +205,14 @@ Shader "Custom/Wall Text Blend"
                 inputData.positionWS = input.positionWS;
                 inputData.positionCS = input.positionHCS;
                 inputData.normalWS = normalWS;
-                inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                inputData.viewDirectionWS = viewDirWS;
                 inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 inputData.fogCoord = input.fogFactor;
                 inputData.vertexLighting = 0;
                 inputData.bakedGI = SampleSH(normalWS);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionHCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);
-                inputData.tangentToWorld = half3x3(input.tangentWS, input.bitangentWS, input.normalWS);
+                inputData.tangentToWorld = tangentToWorld;
 
                 half4 color = UniversalFragmentPBR(inputData, surfaceData);
                 half3 matteColor = albedo * max(SampleSH(normalWS), half3(0.2, 0.2, 0.2));

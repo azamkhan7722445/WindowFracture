@@ -107,9 +107,10 @@ Shader "Custom/PaperPaint"
             #pragma vertex   ShadowVert
             #pragma fragment ShadowFrag
             #pragma multi_compile_shadowcaster
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _PaperTexture_ST;
@@ -120,6 +121,7 @@ Shader "Custom/PaperPaint"
             CBUFFER_END
 
             float3 _LightDirection;
+            float3 _LightPosition;
 
             struct Attributes { float4 posOS : POSITION; float3 normalOS : NORMAL; };
             struct Varyings   { float4 posCS : SV_POSITION; };
@@ -129,12 +131,15 @@ Shader "Custom/PaperPaint"
                 Varyings OUT;
                 float3 posWS    = TransformObjectToWorld(IN.posOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(IN.normalOS);
-                float4 posCS    = TransformWorldToHClip(ApplyShadowBias(posWS, normalWS, _LightDirection));
-                #if UNITY_REVERSED_Z
-                    posCS.z = min(posCS.z, UNITY_NEAR_CLIP_VALUE);
-                #else
-                    posCS.z = max(posCS.z, UNITY_NEAR_CLIP_VALUE);
-                #endif
+
+#if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                float3 lightDirectionWS = normalize(_LightPosition - posWS);
+#else
+                float3 lightDirectionWS = _LightDirection;
+#endif
+
+                float4 posCS = TransformWorldToHClip(ApplyShadowBias(posWS, normalWS, lightDirectionWS));
+                posCS = ApplyShadowClamping(posCS);
                 OUT.posCS = posCS;
                 return OUT;
             }

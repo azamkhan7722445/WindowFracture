@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Arslan.Scripting;
 using Azam_data.Bomb;
+using GlassSystem.Sample;
 using GlassSystem.Scripts;
 using Sirenix.OdinInspector;
 using UnityEngine;
@@ -117,7 +118,7 @@ public class DeadlineSceneHandler : MonoBehaviour, IManagerInterface
             timerController.SetTime(0f, levelFailDelay);
 
         _levelFailTimerRoutine = StartCoroutine(LevelFailTimer());
-        
+
         yield return null;
     }
 
@@ -305,6 +306,8 @@ public class DeadlineSceneHandler : MonoBehaviour, IManagerInterface
     {
         int blastCount = Mathf.Max(1, levelFailBlastCount);
 
+        CameraShake.Instance?.Shake();
+
         for (int i = 0; i < blastCount; i++)
         {
             PlayBlastParticle(GetRandomScreenPosition());
@@ -388,7 +391,7 @@ public class DeadlineSceneHandler : MonoBehaviour, IManagerInterface
             gamePanelHandling = GamePanelHandling.Instance;
 
         if (gamePanelHandling != null)
-            gamePanelHandling.LevelFailed();
+            gamePanelHandling.LevelComplete();
         else
             Debug.LogWarning(
                 $"{nameof(DeadlineSceneHandler)} could not find a {nameof(GamePanelHandling)} to show the fail panel.",

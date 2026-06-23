@@ -31,7 +31,7 @@ namespace GlassSystem.Sample
             _isShaking = true;
         }
 
-        void LateUpdate()
+        private void LateUpdate()
         {
             if (!_isShaking) return;
 
