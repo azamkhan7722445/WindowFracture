@@ -145,6 +145,6 @@ public class Main_Menu_UI_Manager : MonoBehaviour, IManagerInterface
 
         string[] scenes = { SCENE_ANXIETY, SCENE_FILTER, SCENE_DEADLINE };
 
-        _ = SceneLoadManager.Instance.LoadSceneAsync(scenes[_selected], LoadSceneMode.Single, true, 2);
+        _ = SceneLoadManager.Instance.LoadSceneAsync(scenes[_selected], LoadSceneMode.Single, true, 0.5f);
     }
 }

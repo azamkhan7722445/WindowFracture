@@ -1808,10 +1808,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   glassPanel: {fileID: 849259219}
   gamePanelHandling: {fileID: 988920187}
-  autoShatterHealthPercent: 40
+  autoShatterHealthPercent: 25
   levelCompleteShatterDelay: 0.25
   levelCompletePanelDelay: 1.25
-  levelCompleteShardsPerFrame: 2
+  levelCompleteShardsPerFrame: 1
   inputTxtPanelObj: {fileID: 988920188}
   inputTxt: {fileID: 1788194763}
   inputAreaContinueBtn: {fileID: 988920189}
@@ -1969,7 +1969,7 @@ Camera:
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
-  m_AllowMSAA: 1
+  m_AllowMSAA: 0
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
   m_OcclusionCulling: 1
@@ -2308,7 +2308,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_RenderShadows: 1
+  m_RenderShadows: 0
   m_RequiresDepthTextureOption: 2
   m_RequiresOpaqueTextureOption: 2
   m_CameraType: 0
@@ -2375,7 +2375,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 9.739528
+  orthographic size: 8.97
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2

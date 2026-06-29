@@ -41,10 +41,11 @@ Shader "Custom/Wall Text Blend"
             ZTest LEqual
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_fog
+            #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -88,6 +89,7 @@ Shader "Custom/Wall Text Blend"
                 float3 normalOS : NORMAL;
                 float4 tangentOS : TANGENT;
                 float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
@@ -102,6 +104,7 @@ Shader "Custom/Wall Text Blend"
                 float3 bitangentWS : TEXCOORD6;
                 float3 positionWS : TEXCOORD7;
                 half fogFactor : TEXCOORD8;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             float ValueNoise(float2 uv)
@@ -127,6 +130,9 @@ Shader "Custom/Wall Text Blend"
             Varyings vert(Attributes input)
             {
                 Varyings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
 
                 output.positionHCS = positionInputs.positionCS;
@@ -154,6 +160,7 @@ Shader "Custom/Wall Text Blend"
 
             half4 frag(Varyings input) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(input);
                 half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 half3x3 tangentToWorld = half3x3(input.tangentWS, input.bitangentWS, input.normalWS);
                 half3 viewDirTS = mul(transpose(tangentToWorld), viewDirWS);

@@ -2,6 +2,8 @@ using GlassSystem.Scripts;
 using System.Collections;
 using Arslan.Scripting;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 namespace GlassSystem.Sample
 {
@@ -12,6 +14,7 @@ namespace GlassSystem.Sample
 
 
         private bool CanShoot = true;
+        private Coroutine _shootRoutine;
 
         private void Start()
         {
@@ -20,20 +23,61 @@ namespace GlassSystem.Sample
 
         void Update()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (TryGetShootPosition(out Vector2 screenPosition))
             {
-               
-               Invoke(nameof(Shoot),0.15f);
+                if (_shootRoutine != null)
+                    StopCoroutine(_shootRoutine);
+
+                _shootRoutine = StartCoroutine(ShootAfterDelay(screenPosition));
             }
         }
 
-        void Shoot()
+        bool TryGetShootPosition(out Vector2 screenPosition)
+        {
+            Touchscreen touchscreen = Touchscreen.current;
+            if (touchscreen != null && touchscreen.primaryTouch.press.wasPressedThisFrame)
+            {
+                int touchId = touchscreen.primaryTouch.touchId.ReadValue();
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touchId))
+                {
+                    screenPosition = Vector2.zero;
+                    return false;
+                }
+
+                screenPosition = touchscreen.primaryTouch.position.ReadValue();
+                return true;
+            }
+
+            Mouse mouse = Mouse.current;
+            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                {
+                    screenPosition = Vector2.zero;
+                    return false;
+                }
+
+                screenPosition = mouse.position.ReadValue();
+                return true;
+            }
+
+            screenPosition = Vector2.zero;
+            return false;
+        }
+
+        IEnumerator ShootAfterDelay(Vector2 screenPosition)
+        {
+            yield return new WaitForSeconds(0.15f);
+            Shoot(screenPosition);
+            _shootRoutine = null;
+        }
+
+        void Shoot(Vector2 screenPosition)
         {
             if (!CanShoot) return;
             RaycastHit hit;
-           // if()
             if (GamePanelHandling.Instance.IsPaused() || GamePanelHandling.Instance.IsLevelEnded()) return;
-            var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            var ray = Camera.main.ScreenPointToRay(screenPosition);
             if (Physics.Raycast(ray, out hit, Mathf.Infinity))
             {
                 Debug.DrawRay(ray.origin, ray.direction * hit.distance, Color.yellow, 10);
@@ -46,6 +90,7 @@ namespace GlassSystem.Sample
                     while (true)
                         try
                         {
+                            VibrationsHandler.GlassTap();
                             glass.Break(hit.point, ray.direction * impactForce);
                             CameraShake.Instance?.Shake();
                             return;
@@ -67,7 +112,6 @@ namespace GlassSystem.Sample
             CanShoot = _canShoot;
         }
 
-        public void SetAction(bool canShoot) => StartCoroutine(ActiveDeplay(canShoot ? 0.5f : 0 , canShoot));
-
+        public void SetAction(bool canShoot) => StartCoroutine(ActiveDeplay(canShoot ? 0.5f : 0, canShoot));
     }
 }

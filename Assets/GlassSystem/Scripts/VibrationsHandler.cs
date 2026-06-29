@@ -7,9 +7,11 @@ namespace GlassSystem.Scripts
     {
         private const bool DefaultToRegularVibrate = true;
         private const bool AlsoRumble = false;
+        private const float RepeatedStrongImpactInterval = 0.08f;
 
         private static bool _isEnabled = true;
         private static bool _logInEditor = true;
+        private static float _lastRepeatedStrongImpactTime = -RepeatedStrongImpactInterval;
 
         public static bool IsEnabled => _isEnabled;
         public static bool SupportsDeviceHaptics => IsNiceVibrationsSupportedPlatform();
@@ -84,12 +86,26 @@ namespace GlassSystem.Scripts
 
         public static void GlassBreak()
         {
-            MediumImpact();
+            StrongImpact("Glass Break");
         }
 
         public static void FinalShatter()
         {
-            HeavyImpact();
+            StrongImpact("Final Shatter");
+        }
+
+        public static void RepeatedFinalShatter()
+        {
+            if (Time.unscaledTime - _lastRepeatedStrongImpactTime < RepeatedStrongImpactInterval)
+                return;
+
+            _lastRepeatedStrongImpactTime = Time.unscaledTime;
+            FinalShatter();
+        }
+
+        public static void BombBlast()
+        {
+            StrongImpact("Bomb Blast");
         }
 
         public static void VibrateDefault()
@@ -124,6 +140,19 @@ namespace GlassSystem.Scripts
                 return;
 
             MMVibrationManager.Haptic(hapticType, DefaultToRegularVibrate, AlsoRumble);
+        }
+
+        private static void StrongImpact(string hapticName)
+        {
+            if (!_isEnabled)
+                return;
+
+            LogEditorHaptic(hapticName);
+
+            if (!IsNiceVibrationsSupportedPlatform())
+                return;
+
+            MMVibrationManager.TransientHaptic(1f, 1f, AlsoRumble);
         }
 
         private static bool IsNiceVibrationsSupportedPlatform()

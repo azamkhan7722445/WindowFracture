@@ -292,6 +292,7 @@ public class DeadlineSceneHandler : MonoBehaviour, IManagerInterface
 
         blastObject.transform.position = position;
         blastObject.SetActive(true);
+        VibrationsHandler.BombBlast();
 
         if (blastObject.TryGetComponent(out ParticleSystem particle))
         {

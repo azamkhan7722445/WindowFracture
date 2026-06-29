@@ -1,5 +1,6 @@
 using System.Collections;
 using DG.Tweening;
+using GlassSystem.Scripts;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -146,6 +147,7 @@ namespace Arslan.Scripting
             if (isLevelEnded)
                 return;
 
+            VibrationsHandler.SoftImpact();
             SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
 
             isPaused = false;
@@ -184,28 +186,32 @@ namespace Arslan.Scripting
 
         public void NextLevel()
         {
+            VibrationsHandler.SoftImpact();
             ResumeTime();
             SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
-            _ = SceneLoadManager.Instance.LoadSceneAsync(NextScene,LoadSceneMode.Single,true,1.5f);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(NextScene,LoadSceneMode.Single,true,0.5f);
         }
 
 
         public void RetryLevel()
         {
+            VibrationsHandler.SoftImpact();
             ResumeTime();
             SoundManager.Instance.PlayAudio(SoundManager.Instance.BtnClickSfx);
-            _ = SceneLoadManager.Instance.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex,LoadSceneMode.Single,true,1.5f);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex,LoadSceneMode.Single,true,0.5f);
         }
 
         public void GoHome()
         {
+            VibrationsHandler.SoftImpact();
             ResumeTime();
             SoundManager.Instance.PlayAudio(SoundManager.Instance.BackBtnSfx);
-            _ = SceneLoadManager.Instance.LoadSceneAsync(0,LoadSceneMode.Single,true,1.5f);
+            _ = SceneLoadManager.Instance.LoadSceneAsync(0,LoadSceneMode.Single,true,0.5f);
         }
 
         public void ExitGame()
         {
+            VibrationsHandler.SoftImpact();
             SoundManager.Instance.PlayAudio(SoundManager.Instance.BackBtnSfx);
 
             ResumeTime();

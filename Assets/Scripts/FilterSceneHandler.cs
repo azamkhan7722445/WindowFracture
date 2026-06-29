@@ -114,7 +114,6 @@ namespace DefaultNamespace
             if (levelCompleteShatterDelay > 0f)
                 yield return new WaitForSeconds(levelCompleteShatterDelay);
 
-            VibrationsHandler.FinalShatter();
 
             if (glassPanel != null && glassPanel.BreakSound != null)
                 AudioSource.PlayClipAtPoint(glassPanel.BreakSound, glassPanel.transform.position);

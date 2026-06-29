@@ -3,6 +3,7 @@ using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Renderer))]
 public class Paint_Effect : MonoBehaviour, IManagerInterface
@@ -62,6 +63,8 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
     [Header("Camera Fit")] [SerializeField]
     private Camera targetCamera;
 
+    [SerializeField] private Camera textCamera;
+
     [SerializeField] private float distanceFromCamera = 5f;
     [SerializeField] private bool scaleToDeviceHeightOnStart = true;
     [SerializeField, Range(0.1f, 1.5f)] private float deviceHeightFillPercent = 1f;
@@ -83,6 +86,7 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
     RenderTexture _paintRT;
     RenderTexture _tempRT;
+    RenderTexture _textCameraRuntimeRT;
     Material _surfaceMat;
     Material _brushMat;
     Camera _cam;
@@ -99,7 +103,8 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
     int[] _visiblePixelIndices;
     int _visiblePixelCount;
 
-    static readonly int ID_PaintTex = Shader.PropertyToID("_PaintTexture");
+    static readonly int ID_PaintTex = Shader.PropertyToID("_TextMap");
+    static readonly int ID_PaintTexLegacy = Shader.PropertyToID("_PaintTexture");
     static readonly int ID_BrushUV = Shader.PropertyToID("_BrushUV");
     static readonly int ID_BrushSize = Shader.PropertyToID("_BrushSize");
     static readonly int ID_BrushCol = Shader.PropertyToID("_BrushColor");
@@ -127,6 +132,8 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
         if (scaleToDeviceHeightOnStart)
             ScaleToDeviceHeight();
 
+        SetupTextCameraTargetTexture();
+
         BuildVisiblePixelCache();
 
         _paintRT = CreateRT(canvasResolution);
@@ -146,6 +153,7 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
             _surfaceMat.SetTexture(ID_PaperTex, paperTexture);
 
         _surfaceMat.SetTexture(ID_PaintTex, _paintRT);
+        _surfaceMat.SetTexture(ID_PaintTexLegacy, _paintRT);
 
         // Use directly assigned shader first — guaranteed included in build.
         // Fall back to Shader.Find only in editor where stripping doesn't apply.
@@ -176,30 +184,65 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
         yield return null;
     }
 
+    void SetupTextCameraTargetTexture()
+    {
+        Camera camera = textCamera != null ? textCamera : GameObject.Find("TextCamera")?.GetComponent<Camera>();
+        if (camera == null)
+            return;
+
+        if (_textCameraRuntimeRT == null)
+        {
+            RenderTextureDescriptor descriptor = new RenderTextureDescriptor(canvasResolution, canvasResolution, RenderTextureFormat.ARGB32, 0)
+            {
+                msaaSamples = 1,
+                useMipMap = false,
+                autoGenerateMips = false,
+                sRGB = QualitySettings.activeColorSpace == ColorSpace.Linear,
+                volumeDepth = 1,
+                dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
+                enableRandomWrite = false,
+                depthBufferBits = 0
+            };
+
+            _textCameraRuntimeRT = new RenderTexture(descriptor)
+            {
+                name = "TextCamera_RuntimeRT",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            _textCameraRuntimeRT.Create();
+        }
+
+        camera.targetTexture = _textCameraRuntimeRT;
+    }
+
     bool GetInputPosition(out Vector2 screenPos, out int fingerId)
     {
-        if (Input.touchCount > 0)
+        Touchscreen touchscreen = Touchscreen.current;
+        if (touchscreen != null && touchscreen.primaryTouch.press.isPressed)
         {
-            Touch touch = Input.GetTouch(0);
-            TouchPhase phase = touch.phase;
-            if (phase == TouchPhase.Began || phase == TouchPhase.Moved || phase == TouchPhase.Stationary)
+            UnityEngine.InputSystem.TouchPhase phase = touchscreen.primaryTouch.phase.ReadValue();
+            if (phase == UnityEngine.InputSystem.TouchPhase.Began ||
+                phase == UnityEngine.InputSystem.TouchPhase.Moved ||
+                phase == UnityEngine.InputSystem.TouchPhase.Stationary)
             {
-                // Skip if finger is over a UI element
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                var touchId = touchscreen.primaryTouch.touchId.ReadValue();
+                if (EventSystem.current && EventSystem.current.IsPointerOverGameObject(touchId))
                 {
                     screenPos = Vector2.zero;
                     fingerId = -1;
                     return false;
                 }
 
-                screenPos = touch.position;
-                fingerId = touch.fingerId;
+                screenPos = touchscreen.primaryTouch.position.ReadValue();
+                fingerId = touchId;
                 return true;
             }
         }
-        else if (Input.GetMouseButton(0))
+
+        Mouse mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.isPressed)
         {
-            // Skip if mouse is over a UI element (editor)
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             {
                 screenPos = Vector2.zero;
@@ -207,7 +250,7 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
                 return false;
             }
 
-            screenPos = Input.mousePosition;
+            screenPos = mouse.position.ReadValue();
             fingerId = -1;
             return true;
         }
@@ -310,7 +353,16 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
             _brushMat.SetTexture(ID_BrushTex, brushTexture);
 
         Graphics.Blit(_paintRT, _tempRT, _brushMat);
-        Graphics.Blit(_tempRT, _paintRT);
+
+        RenderTexture previousPaint = _paintRT;
+        _paintRT = _tempRT;
+        _tempRT = previousPaint;
+
+        if (_surfaceMat != null)
+        {
+            _surfaceMat.SetTexture(ID_PaintTex, _paintRT);
+            _surfaceMat.SetTexture(ID_PaintTexLegacy, _paintRT);
+        }
     }
 
     void CheckPaintPercentageTimer()
@@ -536,6 +588,9 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
     void OnDestroy()
     {
+        if (textCamera != null && textCamera.targetTexture == _textCameraRuntimeRT)
+            textCamera.targetTexture = null;
+
         if (_paintRT != null)
         {
             _paintRT.Release();
@@ -553,12 +608,34 @@ public class Paint_Effect : MonoBehaviour, IManagerInterface
 
         if (_percentageReadTexture != null)
             Destroy(_percentageReadTexture);
+
+        if (_textCameraRuntimeRT != null)
+        {
+            _textCameraRuntimeRT.Release();
+            Destroy(_textCameraRuntimeRT);
+        }
     }
 
     static RenderTexture CreateRT(int size)
     {
-        var rt = new RenderTexture(size, size, 0, RenderTextureFormat.ARGB32);
+        var descriptor = new RenderTextureDescriptor(size, size)
+        {
+            depthBufferBits = 0,
+            msaaSamples = 1,
+            mipCount = 1,
+            useMipMap = false,
+            autoGenerateMips = false,
+            sRGB = QualitySettings.activeColorSpace == ColorSpace.Linear,
+            volumeDepth = 1,
+            dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
+            enableRandomWrite = false,
+            colorFormat = RenderTextureFormat.ARGB32
+        };
+
+        var rt = new RenderTexture(descriptor);
+        rt.name = "Paint_Effect_RT";
         rt.filterMode = FilterMode.Bilinear;
+        rt.wrapMode = TextureWrapMode.Clamp;
         rt.Create();
         return rt;
     }

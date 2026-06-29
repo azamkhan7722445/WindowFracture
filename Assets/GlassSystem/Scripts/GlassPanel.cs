@@ -51,6 +51,7 @@ namespace GlassSystem.Scripts
         private int _totalShardCount;
         private int _brokenShardCount;
         private bool _canBreak = true;
+        private bool _isAutoShattering;
 
         public AudioClip BreakSound => breakSound;
         public bool CanShardBreakFromInput => _canBreak;
@@ -210,8 +211,9 @@ namespace GlassSystem.Scripts
             if (_shards.Remove(shard))
             {
                 _brokenShardCount++;
-                TriggerShardBreakHaptic();
-                NotifyRemainingHealthUpdated();
+
+                if (!_isAutoShattering)
+                    NotifyRemainingHealthUpdated();
             }
         }
 
@@ -290,16 +292,10 @@ namespace GlassSystem.Scripts
 
         private void NotifyRemainingHealthUpdated()
         {
+#if UNITY_EDITOR
             Debug.Log($"Glass health: {HealthPercentage:0.0}%");
+#endif
             OnRemainingHealthUpdated?.Invoke(HealthPercentage);
-        }
-
-        private void TriggerShardBreakHaptic()
-        {
-            if (!_canBreak)
-                return;
-
-            VibrationsHandler.GlassTap();
         }
 
         private float GetInputDamageRadiusWorld()
@@ -446,7 +442,9 @@ namespace GlassSystem.Scripts
                 yield break;
 
             _canBreak = false;
+            _isAutoShattering = true;
             PlayShatterSound();
+            VibrationsHandler.FinalShatter();
 
             Shard[] remainingShards = _shards.ToArray();
             int shatteredThisFrame = 0;
@@ -456,6 +454,8 @@ namespace GlassSystem.Scripts
             {
                 if (shard == null)
                     continue;
+
+                VibrationsHandler.RepeatedFinalShatter();
 
                 Vector3 shatterPosition = shard.transform.position;
                 Vector3 shatterDirection = (shatterPosition - transform.position).normalized;
@@ -472,9 +472,13 @@ namespace GlassSystem.Scripts
                 if (shatteredThisFrame >= shardsPerFrame)
                 {
                     shatteredThisFrame = 0;
+                    VibrationsHandler.RepeatedFinalShatter();
                     yield return null;
                 }
             }
+
+            _isAutoShattering = false;
+            NotifyRemainingHealthUpdated();
         }
 
         public IEnumerator BlastRemainingGlassTowards(Vector3 targetPosition, float force, float torque, int shardsPerFrame)
@@ -483,7 +487,9 @@ namespace GlassSystem.Scripts
                 yield break;
 
             _canBreak = false;
+            _isAutoShattering = true;
             PlayShatterSound();
+            VibrationsHandler.FinalShatter();
 
             Shard[] remainingShards = _shards.ToArray();
             int blastedThisFrame = 0;
@@ -504,10 +510,12 @@ namespace GlassSystem.Scripts
                 if (blastedThisFrame >= shardsPerFrame)
                 {
                     blastedThisFrame = 0;
+                    VibrationsHandler.RepeatedFinalShatter();
                     yield return null;
                 }
             }
 
+            _isAutoShattering = false;
             NotifyRemainingHealthUpdated();
         }
 

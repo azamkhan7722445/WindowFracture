@@ -739,12 +739,13 @@ MonoBehaviour:
   brushTexture: {fileID: 2800000, guid: 1dd9fa2d99a25ba4499aa14506163625, type: 3}
   brushStampShader: {fileID: 4800000, guid: 3178c3ea683b9ff4098bcb6677059be9, type: 3}
   targetCamera: {fileID: 0}
+  textCamera: {fileID: 0}
   distanceFromCamera: 5
   scaleToDeviceHeightOnStart: 1
   deviceHeightFillPercent: 1
   limitCompletionToCameraView: 1
   gameplayViewportMargin: 0
-  levelCompletePercent: 70
+  levelCompletePercent: 80
   levelCompleteUI: {fileID: 226943230}
   percentageCheckInterval: 0.25
   paintedAlphaThreshold: 0.1
